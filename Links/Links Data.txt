@@ -1,0 +1,3 @@
+- Integral SMC example: https://la.mathworks.com/matlabcentral/fileexchange/75140-integral-sliding-mode-controller
+- SMC example mass and damper: https://la.mathworks.com/matlabcentral/fileexchange/52429-example-on-sliding-mode-control
+- 
