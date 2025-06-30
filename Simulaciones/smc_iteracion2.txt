@@ -1,0 +1,70 @@
+function T_r = fcn(q,q_ref, w)
+%Inertia
+I_xx = 2e-3;
+I_yy = 2e-3;
+I_zz = 2e-3;
+%Error between the quaternions
+%Calculate relative quaternion (q2 * inv(q1))
+q_error = zeros(1,4); 
+q_error = quatmultiply(q_ref, quatinv(q));
+%Persistent variable to store previous error
+persistent e_prev
+if isempty(e_prev)
+   e_prev = [1 0 0 0];
+end 
+persistent S_prev
+if isempty(S_prev)
+    S_prev = [0 0 0 0];
+end
+persistent q_prev
+if isempty(q_prev)
+    q_prev = [0 0 0 0];
+end
+persistent w_prev
+if isempty(w_prev)
+    w_prev = [0 0 0 0];
+end
+dt = 10e-3; %Sampling time
+a = 1;
+b = 1;
+%Sliding surface  S = e' + a*e
+q_diff = quatmultiply(q_error, quatinv(e_prev));
+S = [b*q_diff(2)/dt + a*q_error(2);
+    b*q_diff(3)/dt + a*q_error(3);
+    0];
+%Save in memory
+e_prev = q_error;
+S_prev = S;
+%Dynamics 
+f = [-0.5*(q(4)*w(2) - q(3)*w(3) - q(1)*w(1));
+    -0.5*(q(2)*w(3) - q(4)*w(1) - q(1)*w(2));
+    -0.5*(q(3)*w(1) - q(2)*w(2) - q(1)*w(3));
+    -(I_zz - I_yy)*w(2)*w(3)/I_xx;
+    -(I_xx - I_zz)*w(1)*w(3)/I_yy;
+    -(I_yy - I_xx)*w(1)*w(2)/I_zz];
+%Input 
+g = [0 0 0;
+    0 0 0;
+    0 0 0;
+    1/I_xx 0 0;
+    0 1/I_yy 0;
+    0 0 1/I_zz];
+%Control input: 
+% u = - (dS/dx * g(x))^-1 * dS/dx * f(x)
+dS_dt = (S - S_prev)/dt;
+x = [q, w];
+x_prev = [q_prev, w_prev];
+dx_dt = (x - x_prev)/dt;
+dS_dx = zeros(3, 6);
+for i=1:lenght(dx_dt)
+    dS_dx(i) = dS_dt(i)'/dx_dt(i);
+    
+end
+%Save in memory
+q_prev = q;
+w_prev = w;
+%Control input
+u = - (dS_dx * g)^-1 \ (dS_dx*f);
+%Output
+T_r = [u(1) u(2) 0];
+

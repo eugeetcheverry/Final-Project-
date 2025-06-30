@@ -1,0 +1,38 @@
+function T_r = fcn(q,q_ref, w)
+%Inertia
+I_xx = 2e-3;
+I_yy = 2e-3;
+I_zz = 2e-3;
+%Error between the quaternions
+%Calculate relative quaternion (q2 * inv(q1))
+q_error = zeros(1,4); 
+q_error = quatmultiply(q_ref, quatinv(q));
+%Persistent variable to store previous error
+persistent e_prev
+if isempty(e_prev)
+   e_prev = [0 0 0 0];
+end 
+dt = 10e-3; %Sampling time
+a = 1;
+%Sliding surface
+q_diff = quatmultiply(q_error, quatinv(e_prev))
+sj = q_diff(3)/dt + a*q_error(3);
+sk = q_diff(4)/dt + a*q_error(4); % S = e' + a * e
+%Save in memory
+e_prev = q_error;
+%Dynamics 
+f_j = -((I_xx - I_zz)/I_yy)*w(3)*w(1);
+f_k = -((I_yy - I_xx)/I_zz)*w(2)*w(1);
+%Input 
+g_j = 1/I_yy;
+g_k = 1/I_zz;
+% Control law: u = -inv(Cg) * Cf
+% Sliding matrix C = [0 0 1 0 0 a 0; 0 0 0 1 0 0 a]
+% Only affects uj and uk, so reduced to:
+Cg = [g_j 0; 0 g_k];
+Cf = [f_j + a * 0; f_k + a * 0];  % No time deriv of w_j, w_k here
+% Control torques (only j and k)
+u_jk = -Cg \ Cf;
+% Assemble total torque vector
+T_r = [0 u_jk(1) u_jk(2)];
+
