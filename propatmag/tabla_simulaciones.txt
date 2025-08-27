@@ -1,0 +1,4 @@
+201120 - Simulacion orbita 7000000, 0.01, 6° - Parámetros originales de la simulacion
+202355 - Lo mismo pero polar 95°
+203328 - Lo mismo pero siempre en eclipse
+204420 - Parametros nuestros K_v=20 K_p=0.001 Dice euge que el cuando controla posición el k_v tiene que ser más bajo que el k_p.
