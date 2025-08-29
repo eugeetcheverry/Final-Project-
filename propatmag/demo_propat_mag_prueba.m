@@ -43,7 +43,7 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 
 % Propagation time in seconds:
 tstart = 0;              % initial time (sec)
-tstep = 1;               % step time (sec)
+tstep = 3;               % step time (sec)
 tend = 10*orb_period;    % end time (10 minutes)
 
 % Inertia matrix of axis-symetric rigid body:
@@ -132,12 +132,12 @@ for t = tstart:tstep:tend
 
         % Magnetic Control
         %k_p = 0.0000003; % ganancia proporcional
-        k_p = 0.001;
+        k_p = 0.02;
         %k_v = 0.4;              % ganancia derivativa
-        k_v = 20; 
+        k_v = 10; 
         %eps = 0.01;             % epsilon
-        eps = 0.01;
-        earth_field_b = quatrmx(quat)*earth_field;
+        eps = 0.001;
+        %earth_field_b = quatrmx(quat)*earth_field;
 
         dq = quat(1:3);
         dw = w_ang;
@@ -165,8 +165,8 @@ for t = tstart:tstep:tend
         
         % Sun pointing: término proporcional
         if (eclipse == 0 && signq4*signq4>0)
-            u = u - eps*eps*k_p*inv(iner)*dq*signq4;
-            %u = u - eps*eps*k_p*dq*signq4;
+            %u = u - eps*eps*k_p*inv(iner)*dq*signq4;
+            u = u - eps*eps*k_p*dq*signq4;
         end
         
         normb2 = norm(earth_field)^2;

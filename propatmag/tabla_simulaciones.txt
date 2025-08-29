@@ -2,3 +2,5 @@
 202355 - Lo mismo pero polar 95°
 203328 - Lo mismo pero siempre en eclipse
 204420 - Parametros nuestros K_v=20 K_p=0.001 Dice euge que el cuando controla posición el k_v tiene que ser más bajo que el k_p.
+214002 - Cambio en el calculo del campo magnetico en la terna del cuerpo, sacado inv(iner) del control proporcional y con parametros k_v = 10 k_p = 0.02 eps = 0.001
+(si se sube mas el k_p se va al carajo todo)
