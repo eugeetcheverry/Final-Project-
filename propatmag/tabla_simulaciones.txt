@@ -4,3 +4,11 @@
 204420 - Parametros nuestros K_v=20 K_p=0.001 Dice euge que el cuando controla posición el k_v tiene que ser más bajo que el k_p.
 214002 - Cambio en el calculo del campo magnetico en la terna del cuerpo, sacado inv(iner) del control proporcional y con parametros k_v = 10 k_p = 0.02 eps = 0.001
 (si se sube mas el k_p se va al carajo todo)
+184757 - Fuera torque de error (ambt), pusimos de vuelta dqs multiplicado por sgnq4^2
+185621 - Ahora tomamos la cuarta componente del vector dqs y le tomamos el signo a eso, volvemos a multiplicar por signq4 solo
+185854 - eclipse nulo
+190420 - eclipse nulo y velocidades iniciales de 10 grad/s 
+191447 - solo perturbacion de peor caso (ambt)
+192513 - solo perturbación por momento residual del 1% del maximo (investigar algoritmos para la estimación del momres y la calibracion de magnetometro)
+193243 - idem anterior pero con 0.5%, igual no estabiliza por ganancias bajas
+200048 - solo gradiente gravitatorio, eje y con 4 veces la inercia que teníamos

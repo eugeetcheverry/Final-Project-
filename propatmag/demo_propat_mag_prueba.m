@@ -26,7 +26,7 @@ quat = ezxzquat(eulzxz);        % converted from Euler angles
 quat = quat/norm(quat);
 
 % Angular velocity vector in body frame:
-w_ang = [1, 1, 1]'*pi/180;           % in radians/sec
+w_ang = [10, 10, 10]'*pi/180;           % in radians/sec
     
 % Compute the variations in keplerian elements due to the Earth oblateness
 delk = delkep(kepel);
@@ -47,7 +47,7 @@ tstep = 3;               % step time (sec)
 tend = 10*orb_period;    % end time (10 minutes)
 
 % Inertia matrix of axis-symetric rigid body:
-iner = [0.002 0 0; 0 0.002 0; 0 0 0.002];         % in kg*m*m
+iner = [0.002 0 0; 0 0.008 0; 0 0 0.002];         % in kg*m*m
 %iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
 
 % Inverse inertia matrix:
@@ -95,10 +95,15 @@ for t = tstart:tstep:tend
     % Perturbation torques:
     A    = quatrmx(quat);
     exb  = A(:,1);
-    ambt = 3*omeg_0^2*cross(exb,iner*exb);
+    grad_grav = 3*omeg_0^2*cross(exb,iner*exb);
     
     % Peor caso
-    ambt = 2e-10*[1 1 1]';
+    %ambt = 2e-10*[1 1 1]';
+    ambt = 0;
+    
+    %Error cte al momento mag
+    %mom_res = maxmagmom*0.005;
+    mom_res = 0;
     
     % External torques (perturbation + control)
     ext_torq = ambt + contq;
@@ -146,9 +151,13 @@ for t = tstart:tstep:tend
         angles = asin(norm(dqs));
         versors = dqs/norm(dqs);
         dqs = sin(angles/2)*versors;
+        dqs4 = cos(angles/2); 
         
-        if (norm(dw)<0.001 && quat(4)*quat(4)>0.1 && signq4==0) 
-          signq4=sign(quat(4));
+        %if (norm(dw)<0.001 && quat(4)*quat(4)>0.1 && signq4==0) 
+         % signq4=sign(quat(4));
+        %end
+        if (norm(dw)<0.001 && dqs4*dqs4>0.1 && signq4==0) 
+           signq4=sign(dqs4);
         end
         
         % Control Derivativo
@@ -162,16 +171,17 @@ for t = tstart:tstep:tend
                 eclipse = 1;
             end
         end
+        %eclipse = 0; 
         
         % Sun pointing: término proporcional
         if (eclipse == 0 && signq4*signq4>0)
             %u = u - eps*eps*k_p*inv(iner)*dq*signq4;
-            u = u - eps*eps*k_p*dq*signq4;
+            u = u - eps*eps*k_p*dqs*signq4;
         end
         
         normb2 = norm(earth_field)^2;
 
-        mag_mom = 1/normb2 * cross(earth_field_b, u);
+        mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res;
         
         if max(abs(mag_mom)) > maxmagmom             % torqrod saturation with bisection
           mag_mom = mag_mom*maxmagmom/max(abs(mag_mom));
@@ -249,6 +259,6 @@ plot(time/orb_period,vmag_mom(2,:),'g');hold on;
 plot(time/orb_period,vmag_mom(3,:),'b');hold on;
 plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Magnetorquers Control Magnetic Torque [Nm]')
+title('Magnetorquers Control Magnetic Moment [Am2]')
 grid on;
 print(gcf, ['Momento_mag' timestamp '.png'], '-dpng')
