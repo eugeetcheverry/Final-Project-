@@ -9,14 +9,22 @@
 
 timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
+%-------------------------------ORBITA-------------------------------------
+
 kepel = [7000000, 0.01, 95*pi/180, 0, 0, 0];
+
 % Orbit state vector:
 stat = kepel_statvec(kepel);
+
+% Compute the variations in keplerian elements due to the Earth oblateness
+delk = delkep(kepel);
 
 % Velocidad Orbital
 GM = 3.986004418e14;
 orb_period = sqrt(4*pi^2*kepel(1)^3/GM);
 omeg_0 = 2*pi/orb_period;
+
+%--------------------------VALORES INICIALES-------------------------------
 
 % Attitude elements in Euler angles of a 3-1-3 (z-x-z) rotation
 eulzxz = [30, 50, 20]'*pi/180;   % converted from degrees to radians
@@ -28,8 +36,8 @@ quat = quat/norm(quat);
 % Angular velocity vector in body frame:
 w_ang = [10, 10, 10]'*pi/180;           % in radians/sec
     
-% Compute the variations in keplerian elements due to the Earth oblateness
-delk = delkep(kepel);
+
+%-----------------------------EFEMERIDES-----------------------------------
 
 % Ephemerides date in Modified Julian date:
 year = 2009;
@@ -45,6 +53,9 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 tstart = 0;              % initial time (sec)
 tstep = 3;               % step time (sec)
 tend = 10*orb_period;    % end time (10 minutes)
+
+
+%-----------------------------DINAMICA-------------------------------------
 
 % Inertia matrix of axis-symetric rigid body:
 iner = [0.002 0 0; 0 0.008 0; 0 0 0.002];         % in kg*m*m
@@ -63,6 +74,9 @@ mag_mom = [0; 0; 0];      % in A.m
 % ODE solver precision:
 options = odeset('abstol', 1e-4, 'reltol', 1e-4);
 
+
+%-----------------------VECTORES PARA GRAFICAR-----------------------------
+
 % Initial vectors
 time = tstart;          % to store time
 euler = eulzxz*180/pi;  % Euler angles
@@ -70,8 +84,8 @@ omeg = w_ang;           % Angular velocity
 orbit = stat';          % Orbit elements (state vector)
 keorb = kepel';         % Orbit elements (keplerian)
 
-gamavg = 0*eye(3);  % Gamma avg inicial
-maxmagmom = 0.02;      % Tope momento magnético en Am2
+gamavg = 0*eye(3);      % Gamma avg inicial
+maxmagmom = 0.02;       % Tope momento magnético en Am2
 vdq = [0;0;0];
 vdqs = [0;0;0];
 vdw = [0;0;0];
@@ -83,7 +97,16 @@ vmag_mom = u;
 
 earthradius = 6371000;
 
-% Attitude and orbit propagation
+%--------------------------------KALMAN------------------------------------
+
+H = [eye(3) zeros(3)]
+Q = 0.01*eye(3)
+
+x_pred = [w_ang; 0; 0; 0]
+P = eye(6)
+
+%------------------------------SIMULACION----------------------------------
+
 for t = tstart:tstep:tend
 
     % Orbit propagation
@@ -102,8 +125,8 @@ for t = tstart:tstep:tend
     ambt = 0;
     
     %Error cte al momento mag
-    %mom_res = maxmagmom*0.005;
-    mom_res = 0;
+    mom_res = maxmagmom*0.005;
+    %mom_res = 0;
     
     % External torques (perturbation + control)
     ext_torq = ambt + contq;
@@ -118,6 +141,9 @@ for t = tstart:tstep:tend
     if flag_mag == 0
         [T, Y] = ode45('rigbody', tspan, att_vec, options, ext_torq, iner, invin);
     else
+        
+        %-----------------------CAMPO MAGNETICO----------------------------
+        
         % To convert from inertial state vector to terrestrial vector
         geoc = inertial_to_terrestrial(gst(mjd, dfra+t), stat);
 
@@ -135,14 +161,14 @@ for t = tstart:tstep:tend
         earth_field_b = quatrmx(quat)*earth_field_eci;
 
 
-        % Magnetic Control
-        %k_p = 0.0000003; % ganancia proporcional
+        %---------------------CONTROL MAGNETICO----------------------------
+        
+        %k_p = 0.0000003;        % ganancia proporcional
         k_p = 0.02;
         %k_v = 0.4;              % ganancia derivativa
         k_v = 10; 
         %eps = 0.01;             % epsilon
         eps = 0.001;
-        %earth_field_b = quatrmx(quat)*earth_field;
 
         dq = quat(1:3);
         dw = w_ang;
@@ -171,7 +197,7 @@ for t = tstart:tstep:tend
                 eclipse = 1;
             end
         end
-        %eclipse = 0; 
+   
         
         % Sun pointing: término proporcional
         if (eclipse == 0 && signq4*signq4>0)
@@ -188,6 +214,35 @@ for t = tstart:tstep:tend
         end
         
         ext_torq = ext_torq + cross(mag_mom, earth_field_b);
+        
+        %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
+        
+        w_skew = Skew(dw);
+              
+        Jw = iner*dw;
+              
+        Jw_skew = Skew(Jw);
+              
+        B_skew = Skew(earth_field_b);
+              
+        A = [iner\(Jw_skew - w_skew*iner) -inv(iner)*B_skew;
+            zeros(3) zeros(3)];
+        
+        Phi = expm(A*tstep);
+        
+        %Paso de prediccion
+        x_pred = Phi*x_pred;
+        P = Phi*P*Phi';
+
+        %Paso de correccion
+        K = P*H'/Q;
+        
+        x_pred = x_pred + K*(dw - H*x_pred);
+        P = P - P*H'/(H*P*H' + Q)*H*P; 
+        
+        mom_res_pred = x_pred(4:6) - (mag_mom - mom_res);
+        
+        %------------------------------------------------------------------
 
         [T, Y] = ode45('rigbody', tspan, att_vec, options, ext_torq, iner, invin, ...
             mag_mom, earth_field);
@@ -254,6 +309,16 @@ title('Attitude angular velocity')
 grid on;
 
 figure(22);clf;
+plot(time/orb_period,vmag_mom(1,:),'r');hold on;
+plot(time/orb_period,vmag_mom(2,:),'g');hold on;
+plot(time/orb_period,vmag_mom(3,:),'b');hold on;
+plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+title('Magnetorquers Control Magnetic Moment [Am2]')
+grid on;
+print(gcf, ['Momento_mag' timestamp '.png'], '-dpng')
+
+figure(23);clf;
 plot(time/orb_period,vmag_mom(1,:),'r');hold on;
 plot(time/orb_period,vmag_mom(2,:),'g');hold on;
 plot(time/orb_period,vmag_mom(3,:),'b');hold on;
