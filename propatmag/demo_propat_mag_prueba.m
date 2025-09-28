@@ -58,7 +58,7 @@ tend = 10*orb_period;    % end time (10 minutes)
 %-----------------------------DINAMICA-------------------------------------
 
 % Inertia matrix of axis-symetric rigid body:
-iner = [0.002 0 0; 0 0.008 0; 0 0 0.002];         % in kg*m*m
+iner = [0.002 0 0; 0 0.002 0; 0 0 0.002];         % in kg*m*m
 %iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
 
 % Inverse inertia matrix:
@@ -99,15 +99,17 @@ earthradius = 6371000;
 
 %--------------------------------KALMAN------------------------------------
 
-H = [eye(3) zeros(3)]
-Q = 0.01*eye(3)
+H = [eye(3) zeros(3)];
+Q = 0.01*eye(3);
+R = 0.001*eye(3);
 
-x_pred = [w_ang; 0; 0; 0]
-P = eye(6)
+x_pred = [0; 0; 0; 0; 0; 0];
+sigma = eye(6);
 
 %------------------------------SIMULACION----------------------------------
 
 for t = tstart:tstep:tend
+%for t = 1:tstep
 
     % Orbit propagation
     kep2 = kepel + delk*t;
@@ -217,30 +219,7 @@ for t = tstart:tstep:tend
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
         
-        w_skew = Skew(dw);
-              
-        Jw = iner*dw;
-              
-        Jw_skew = Skew(Jw);
-              
-        B_skew = Skew(earth_field_b);
-              
-        A = [iner\(Jw_skew - w_skew*iner) -inv(iner)*B_skew;
-            zeros(3) zeros(3)];
-        
-        Phi = expm(A*tstep);
-        
-        %Paso de prediccion
-        x_pred = Phi*x_pred;
-        P = Phi*P*Phi';
-
-        %Paso de correccion
-        K = P*H'/Q;
-        
-        x_pred = x_pred + K*(dw - H*x_pred);
-        P = P - P*H'/(H*P*H' + Q)*H*P; 
-        
-        mom_res_pred = x_pred(4:6) - (mag_mom - mom_res);
+        [x_pred, sigma] = ekf_rmm(x_pred(1:3), x_pred(4:6), (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, R, tstep);
         
         %------------------------------------------------------------------
 
