@@ -13,7 +13,7 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
 ECLIPSE = 1;
 RMM = 1;
-GRAV_GRAD = 0;
+GRAV_GRAD = 1;
 SOLAR_TORQ = 0;
 DRAG = 0;
 
@@ -75,7 +75,7 @@ tend = 6*orb_period;    % end time (10 minutes)
 %-----------------------------DINAMICA-------------------------------------
 
 % Inertia matrix of axis-symetric rigid body:
-iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];         % in kg*m*m
+iner = [0.0022 0 0; 0 0.0019 0; 0 0 0.0022];         % in kg*m*m
 %iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
 
 % Inverse inertia matrix:
@@ -119,8 +119,9 @@ earthradius = 6371000;
 %--------------------------------KALMAN------------------------------------
 
 H = [eye(3) zeros(3)];
-Q = 0.01*eye(3);
-R = 0.001*eye(3);
+Q = [0.00001*eye(3) zeros(3)
+    zeros(3) 0.00001*eye(3)];
+R = 0.01*eye(3);
 
 x_pred = [0; 0; 0; 0; 0; 0];
 sigma = eye(6);
@@ -215,6 +216,7 @@ for t = tstart:tstep:tend
         dw = w_ang;
         
         dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
+        %dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;1])
         angles = asin(norm(dqs));
         versors = dqs/norm(dqs);
         dqs = sin(angles/2)*versors;
@@ -255,12 +257,12 @@ for t = tstart:tstep:tend
         
         %-------------------------OBSERVABILIDAD---------------------------
 
-        phiks = {phiks phikm1};
+       % phiks = {phiks phikm1};
         
-        for i = 1:N_obs
-            mul = mul*phiks{end-i+1}
-            phikwindow = {phikwindow }
-        end
+        %for i = 1:N_obs
+        %    mul = mul*phiks{end-i+1};
+        %    phikwindow = {phikwindow mul};
+        %end
         
         
         

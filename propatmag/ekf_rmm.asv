@@ -4,27 +4,38 @@ function [x_corr, sigma_corr, phikm1] = ekf_rmm(w, rmm, u, iner, earth_field_b, 
     %Ver que u enmascara una dependencia de w que podría verse en la matriz
     %podría reemplazarse u por la ley de control y solo tener en cuenta la
     %dependencia con x y el tiempo
+    %1/normb2 * cross(cross(earth_field_b, -
+    %eps*k_v*iner*dw),earth_field_b) = - 1/normb2 B_skew * eps*k_v*iner*dw
+    %*B_skew
+    %- 1/normb2 B_skew * eps*k_v*iner* B_skew
+    
     xdot_hat = [inv(iner)*(cross(u, earth_field_b) + cross(rmm, earth_field_b) - cross(w, iner*w));
                 0;
                 0;
                 0];
 
     %xpunt = f(x,u) = f(x,t,n)
+
     %Linealizar en torno a 0
+    k_v = 10;
+    eps = 0.001;
+    normb2 = norm(earth_field_b)^2;
     w_skew = Skew(w);
     Jw = iner*w;
     Jw_skew = Skew(Jw);
     B_skew = Skew(earth_field_b);
     
-    A = [iner\(Jw_skew - w_skew*iner) -inv(iner)*B_skew; %A
+    A = [iner\(Jw_skew - w_skew*iner - 1/normb2 *B_skew * eps*k_v*iner* B_skew)  -inv(iner)*B_skew; %A
             zeros(3) zeros(3)];
         
     %phikm1 = expm(A*dt)
+    %Agregar terminos de mayor orden
     phikm1 = eye(6) + A*dt;
     
     %Al eliminar la dependencia de u, B podría ser una identidad
-    B = [-inv(iner)*B_skew; %B
-            zeros(3)];
+    B = eye(6);
+    %B = [-inv(iner)*B_skew zeros(3);
+    %    zeros(3) eye(3)];
     gammkm1 = dt*phikm1*B;
     
     %Pasito de prediccion
