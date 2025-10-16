@@ -40,7 +40,7 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 % Propagation time in seconds:
 tstart = 0;              % initial time (sec)
 tstep = 10;               % step time (sec)
-tend = 10*orb_period;    % end time (10 minutes)
+tend = 20*orb_period;    % end time (10 minutes)
 
 % Inertia matrix of axis-symetric rigid body:
 iner = [0.005 0 0; 0 0.005 0; 0 0 0.005];         % in kg*m*m
@@ -77,8 +77,13 @@ signq4 = 0;
 vext_torq = u;
 vmag_mom = u;
 
-%B-dot control variables
-dt = 0.01; %seconds
+%Inicializaciones para B-dot
+earth_field_b_ant = [];
+Bdot_f_prev = [0;0;0];
+first_mag_read = true;
+bdot_dt = tstep;
+alpha_bdot = 0.4; % filtro exponencial para Bdot
+
 
 earthradius = 6371000;
 
@@ -132,7 +137,7 @@ for t = tstart:tstep:tend
         % Magnetic Control
         k_p = 0.02;        % ganancia proporcional
         k_v = 10;              % ganancia derivativa
-        eps = 0.01;             % epsilon
+        eps = 0.001;             % epsilon
         earth_field_b = quatrmx(quat)*earth_field;
 
         dq = quat(1:3);
@@ -172,28 +177,45 @@ for t = tstart:tstep:tend
 
         mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res;
         
-        %B-dot controller for eclipse phase
-        %Define K_bdot / k_bdot < k_bdot_max donde 
-        k_bdot_max = mommagmax/B_dot_max;
-        k_bdot_max = maxmagmom/(1e-7); %tanteo
-        k_bdot = 0.2*k_bdot_max;
-        if (eclipse == 1)   
-            B_dot = (earth_field_b - earth_field_b_ant)/dt;
-            %magnetic moment
-            mag_mom = -k_bdot * B_dot;
-            %Saturation
-            mag_mom = max(min(mag_mom, maxmagmom), maxmagmom);
-            %B-dot control
-            u = cross(mag_mom, earth_field_b);
-        end;
-        
-        earth_field_b_ant = earth_field_b;
         
         if max(abs(mag_mom)) > maxmagmom             % torqrod saturation with bisection
           mag_mom = mag_mom*maxmagmom/max(abs(mag_mom));
         end
         
         ext_torq = ext_torq + cross(mag_mom, earth_field_b);
+        
+        %B-dot controller for eclipse phase
+        %Define K_bdot / k_bdot < k_bdot_max donde 
+        %k_bdot_max = maxmagmom/B_dot_max;
+        if first_mag_read
+            earth_field_b_ant = earth_field_b;
+            B_dot_fprev = [0; 0; 0];
+            first_mag_read = false;
+        end;
+        k_bdot_max = maxmagmom/(1e-7); %tanteo
+        k_bdot = 0.5*k_bdot_max;
+        
+        B_dot = (earth_field_b - earth_field_b_ant)/bdot_dt;
+        
+        %Filtrado exponencial
+        B_dot_f = alpha_bdot * B_dot + (1 - alpha_bdot) * Bdot_f_prev;
+        Bdot_f_prev = B_dot_f;
+        eclipse =0;
+        if (eclipse == 1)
+            mag_mom = -k_bdot * B_dot_f;
+            %saturacion
+            mag_mom = sign(mag_mom) .* min(abs(mag_mom), maxmagmom);
+
+            %torque producido por los magnetotors
+            if norm(earth_field_b) > 1e-12
+                u_bdot = cross(mag_mom, earth_field_b);
+            else
+                u_bdot = [0;0;0];
+            end
+            ext_torq = ext_torq + u_bdot;
+        end;
+        
+        earth_field_b_ant = earth_field_b;
 
         [T, Y] = ode45('rigbody', tspan, att_vec, options, ext_torq, iner, invin, ...
             mag_mom, earth_field);
