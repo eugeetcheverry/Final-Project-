@@ -18,7 +18,7 @@ SOLAR_TORQ = 0;
 DRAG = 0;
 
 RMM_ESTIMATE = 1;
-RMM_COMPENSATE = 0;
+RMM_COMPENSATE = 1;
 
 SAVE_FIG = 0;
 
@@ -68,8 +68,8 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 
 % Propagation time in seconds:
 tstart = 0;              % initial time (sec)
-tstep = 3;               % step time (sec)
-tend = 6*orb_period;    % end time (10 minutes)
+tstep = 1;               % step time (sec)
+tend = 3*orb_period;    % end time (10 minutes)
 
 
 %-----------------------------DINAMICA-------------------------------------
@@ -113,18 +113,22 @@ vmag_mom = u;
 vrmm_hat = [0;0;0];
 vdw_hat = [0;0;0];
 vrmm_diag_cov = [0;0;0];
+vQ = [0; 0; 0]
 
 earthradius = 6371000;
 
 %--------------------------------KALMAN------------------------------------
 
 H = [eye(3) zeros(3)];
-Q = [0.00001*eye(3) zeros(3)
-    zeros(3) 0.00001*eye(3)];
+Q = [0.0001^2*eye(3) zeros(3)
+    zeros(3) 0.001^2*eye(3)];
+Q_min = Q;
+alpha = 0.001;
+%alpha = 1;
 R = 0.01*eye(3);
 
 x_pred = [0; 0; 0; 0; 0; 0];
-sigma = eye(6);
+sigma = [[eye(3)*0.00001^2 zeros(3)];[zeros(3) eye(3)*0.001^2]]*2000;
 
 %------------------------------OBSERVABILIDAD------------------------------
 
@@ -241,7 +245,7 @@ for t = tstart:tstep:tend
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
         if RMM_ESTIMATE == 1
-            [x_pred, sigma, phikm1] = ekf_rmm(x_pred(1:3), x_pred(4:6), (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, R, tstep);
+            [x_pred, sigma, phikm1, Q] = ekf_rmm(x_pred, (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, Q_min, alpha, R, tstep);
         end
         %---------------------MOMENTO MAGNÉTICO----------------------------
         
@@ -293,6 +297,7 @@ for t = tstart:tstep:tend
     vrmm_hat = [vrmm_hat x_pred(4:6)];
     vdw_hat = [vdw_hat x_pred(1:3)];
     vrmm_diag_cov = [vrmm_diag_cov [sigma(4,4); sigma(5,5); sigma(6,6)]];
+    vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
 
 end
 
@@ -375,6 +380,19 @@ plot(time/orb_period,vrmm_diag_cov(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 title('Covariance od estimated RMM [Am2]')
+grid on;
+if SAVE_FIG == 1
+    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
+end
+
+
+figure(25);clf;
+plot(time/orb_period,vQ(1,:),'r');hold on;
+plot(time/orb_period,vQ(2,:),'g');hold on;
+plot(time/orb_period,vQ(3,:),'b');hold on;
+%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+title('Estimated Q [Am2]')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
