@@ -1,32 +1,46 @@
-function [x_corr, sigma_corr, phikm1] = ekf_rmm(w, rmm, u, iner, earth_field_b, sigma, z, Q, R, dt)
+function [x_corr, sigma_corr, phikm1, Q] = ekf_rmm(x, u, iner, earth_field_b, sigma, z, Q, Q_min, alpha, R, dt)
     %Calculo de deriva y jacobianos
     
     %Ver que u enmascara una dependencia de w que podría verse en la matriz
     %podría reemplazarse u por la ley de control y solo tener en cuenta la
     %dependencia con x y el tiempo
+    %1/normb2 * cross(cross(earth_field_b, -
+    %eps*k_v*iner*dw),earth_field_b) = - 1/normb2 B_skew * eps*k_v*iner*dw
+    %*B_skew
+    %- 1/normb2 B_skew * eps*k_v*iner* B_skew
+    
+    w = x(1:3);
+    rmm = x(4:6);
+    
     xdot_hat = [inv(iner)*(cross(u, earth_field_b) + cross(rmm, earth_field_b) - cross(w, iner*w));
                 0;
                 0;
                 0];
 
     %xpunt = f(x,u) = f(x,t,n)
+
     %Linealizar en torno a 0
+    k_v = 10;
+    eps = 0.001;
+    normb2 = norm(earth_field_b)^2;
     w_skew = Skew(w);
     Jw = iner*w;
     Jw_skew = Skew(Jw);
     B_skew = Skew(earth_field_b);
     
-    A = [iner\(Jw_skew - w_skew*iner) -inv(iner)*B_skew; %A
+    A = [iner\(Jw_skew - w_skew*iner - 1/normb2 *B_skew * eps*k_v*iner* B_skew)  -inv(iner)*B_skew; %A
             zeros(3) zeros(3)];
         
-    %phikm1 = expm(A*dt)
-    phikm1 = eye(6) + A*dt;
+    phikm1 = expm(A*dt);
+    %Agregar terminos de mayor orden
+    %phikm1 = eye(6) + A*dt + 0.5*A^2*dt;
     
     %Al eliminar la dependencia de u, B podría ser una identidad
-    B = [-inv(iner)*B_skew; %B
-            zeros(3)];
+    B = eye(6);
+    %B = [-inv(iner)*B_skew zeros(3);
+    %    zeros(3) eye(3)];
     gammkm1 = dt*phikm1*B;
-    
+    %gammkm1 = B*dt;
     %Pasito de prediccion
     x_hat = [w; rmm] + xdot_hat*dt;
     sigma_hat = phikm1*sigma*phikm1' + gammkm1*Q*gammkm1';
@@ -42,5 +56,24 @@ function [x_corr, sigma_corr, phikm1] = ekf_rmm(w, rmm, u, iner, earth_field_b, 
     
     %Ecuacion de robotica
     sigma_corr = (eye(6) - K*H)*sigma_hat;
+    
+    dy = z - H*x_corr;
+    
+    Q_avg = (K*dy)*(K*dy)';
+    
+    Q = (1-alpha)*Q + (alpha)*(Q_min + Q_avg);
+    
+    %Cosas que no andan:
+    %Runge para orden 4 para la integracion del sistema no lineal
+    %Hacer moving average para Q_avg
+    %Ver los exponentes de Floquet, aunque da que hablar. 
+    
+    
+    %Investigar (aunque capaz la rta es un no):
+    %Encontrar un paso de tiempo adecuado para lograr un control del ángulo
+    %alrededor del nadir
+    
+    %Probar:
+    %Realizacion de montecarlo
     
 end
