@@ -26,7 +26,7 @@ classdef controller
             
             u = - obj.eps*obj.k_v*obj.iner*dw;
             if pointing
-                u = u - obj.eps*obj.eps*obj.k_p*inv(obj.iner)*dq*signq4
+                u = u - obj.eps*obj.eps*obj.k_p*inv(obj.iner)*dq*signq4;
             end
         end
     end
