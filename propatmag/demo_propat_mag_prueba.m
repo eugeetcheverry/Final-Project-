@@ -7,6 +7,9 @@
 % Orbit keplerian elements:
 %kepel = [6786000, 0.0005, 1.7, 0, 0, 0];   % see function delkep
 
+clear all
+clc
+
 timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
 %---------------------------CONFIGURACIÓN----------------------------------
@@ -19,6 +22,7 @@ DRAG = 0;
 
 RMM_ESTIMATE = 1;
 RMM_COMPENSATE = 1;
+Q_ESTIMATE = 1;
 
 SAVE_FIG = 0;
 
@@ -68,14 +72,14 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 
 % Propagation time in seconds:
 tstart = 0;              % initial time (sec)
-tstep = 1;               % step time (sec)
-tend = 3*orb_period;    % end time (10 minutes)
+tstep = 2;               % step time (sec)
+tend = 10*orb_period;    % end time (10 minutes)
 
 
 %-----------------------------DINAMICA-------------------------------------
 
 % Inertia matrix of axis-symetric rigid body:
-iner = [0.0022 0 0; 0 0.0019 0; 0 0 0.0022];         % in kg*m*m
+iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];         % in kg*m*m
 %iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
 
 % Inverse inertia matrix:
@@ -90,6 +94,38 @@ mag_mom = [0; 0; 0];      % in A.m
 % ODE solver precision:
 options = odeset('abstol', 1e-4, 'reltol', 1e-4);
 
+earthradius = 6371000;
+
+%------------------------------CONTROLADOR---------------------------------
+
+k_p = 0.000025;
+k_v = 0.3; 
+eps = 0.01;            
+
+controller = controller(k_p, k_v, eps, iner);
+
+%--------------------------------KALMAN------------------------------------
+
+H = [eye(3) zeros(3)];
+Q = [0.0001^2*eye(3) zeros(3)
+    zeros(3) 0.001^2*eye(3)];
+Q_min = Q;
+
+alpha = 0;
+if Q_ESTIMATE
+    alpha = 0.001;
+end
+
+R = 0.01*eye(3);
+
+x_pred = [0; 0; 0; 0; 0; 0];
+sigma = [[eye(3)*0.00001^2 zeros(3)];[zeros(3) eye(3)*0.001^2]]*2000;
+
+ekf_rmm = rmm_estimator(x_pred, sigma, Q, R, H, Q_min, alpha, iner, controller, tstep);
+
+%------------------------------OBSERVABILIDAD------------------------------
+
+obs = observability_calculator(H, 10);
 
 %-----------------------VECTORES PARA GRAFICAR-----------------------------
 
@@ -112,27 +148,10 @@ vext_torq = u;
 vmag_mom = u;
 vrmm_hat = [0;0;0];
 vdw_hat = [0;0;0];
-vrmm_diag_cov = [0;0;0];
-vQ = [0; 0; 0]
+vrmm_diag_cov = [sigma(4,4); sigma(5,5); sigma(6,6)];
+vQ = [Q(4,4); Q(5,5); Q(6,6)];
+vdetM = 0;
 
-earthradius = 6371000;
-
-%--------------------------------KALMAN------------------------------------
-
-H = [eye(3) zeros(3)];
-Q = [0.0001^2*eye(3) zeros(3)
-    zeros(3) 0.001^2*eye(3)];
-Q_min = Q;
-alpha = 0.001;
-%alpha = 1;
-R = 0.01*eye(3);
-
-x_pred = [0; 0; 0; 0; 0; 0];
-sigma = [[eye(3)*0.00001^2 zeros(3)];[zeros(3) eye(3)*0.001^2]]*2000;
-
-%------------------------------OBSERVABILIDAD------------------------------
-
-N_obs = 20;
 
 
 %------------------------------SIMULACION----------------------------------
@@ -196,6 +215,7 @@ for t = tstart:tstep:tend
         
         %--------------------------ECLIPSE---------------------------------
 
+        
         eclipse = 0;
         if (orbit(1:3,end)'*sun_dir(mjd, dfra+t)<0 && ECLIPSE == 1)
             perpsun = (eye(3) - sun_dir(mjd, dfra+t)*sun_dir(mjd, dfra+t)')*orbit(1:3,end);
@@ -206,13 +226,13 @@ for t = tstart:tstep:tend
 
         %---------------------CONTROL MAGNETICO----------------------------
         
-        %k_p = 0.0000003;        % ganancia proporcional
-        k_p = 0.002;
-        %k_v = 0.4;              % ganancia derivativa
-        k_v = 10; 
-        %eps = 0.01;             % epsilon
-        eps = 0.001;
         
+        %k_p = 0.0000003;        % ganancia proporcional
+        k_p = 0.000025;
+        %k_v = 0.4;              % ganancia derivativa
+        k_v = 0.3; 
+        eps = 0.01;             % epsilon
+        %eps = 0.001;
         %k_p = 0.000005*5/2.2;           % ganancia proporcional
         %k_v = 0.5*2.2/5;
 
@@ -234,18 +254,25 @@ for t = tstart:tstep:tend
         end
         
         % Control Derivativo
-        u = - eps*k_v*iner*dw;
-        
+        %u = - eps*k_v*iner*dw;
+        pointing = 0;
         % Sun pointing: término proporcional
         if (eclipse == 0 && signq4*signq4>0)
-            u = u - eps*eps*k_p*inv(iner)*dqs*signq4;
+            pointing = 1;
+            %u = u - eps*eps*k_p*inv(iner)*dqs*signq4;
             %u = u - eps*eps*k_p*dqs*signq4;
         end
+        
+        u = get_control_action(controller, dqs, signq4, dw, pointing);
         
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
         if RMM_ESTIMATE == 1
-            [x_pred, sigma, phikm1, Q] = ekf_rmm(x_pred, (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, Q_min, alpha, R, tstep);
+            %[x_pred, sigma, phikm1, Q] = ekf_rmm(x_pred, (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, Q_min, alpha, R, tstep);
+            [ekf_rmm, phik] = update(ekf_rmm, mag_mom - mom_res, earth_field_b, dw);
+            [x_pred, sigma, Q] = get_estimates(ekf_rmm);
+            avas_sigma = eig(sigma);
+            rmm_avas = avas_sigma(4:6);
         end
         %---------------------MOMENTO MAGNÉTICO----------------------------
         
@@ -261,15 +288,12 @@ for t = tstart:tstep:tend
         
         %-------------------------OBSERVABILIDAD---------------------------
 
-       % phiks = {phiks phikm1};
+        obs = update(obs, phik);
         
-        %for i = 1:N_obs
-        %    mul = mul*phiks{end-i+1};
-        %    phikwindow = {phikwindow mul};
-        %end
+        M = get_M(obs);
+        detM = log10(svds(M, 1, 'smallest'));
         
-        
-        
+        %------------------------------------------------------------------
         
         [T, Y] = ode45('rigbody', tspan, att_vec, options, ext_torq, iner, invin, ...
             mag_mom, earth_field);
@@ -296,8 +320,9 @@ for t = tstart:tstep:tend
     vext_torq = [vext_torq ext_torq];
     vrmm_hat = [vrmm_hat x_pred(4:6)];
     vdw_hat = [vdw_hat x_pred(1:3)];
-    vrmm_diag_cov = [vrmm_diag_cov [sigma(4,4); sigma(5,5); sigma(6,6)]];
+    vrmm_diag_cov = [vrmm_diag_cov rmm_avas];
     vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
+    vdetM = [vdetM; detM];
 
 end
 
@@ -393,6 +418,14 @@ plot(time/orb_period,vQ(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 title('Estimated Q [Am2]')
+grid on;
+if SAVE_FIG == 1
+    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
+end
+
+figure(26);clf;
+plot(time/orb_period,vdetM,'r');hold on;
+title('Determinant of M')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
