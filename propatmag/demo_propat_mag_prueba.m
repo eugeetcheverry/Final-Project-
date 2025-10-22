@@ -11,15 +11,13 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
 %---------------------------CONFIGURACIÓN----------------------------------
 
-ECLIPSE = 1;
+ECLIPSE = 0;
 RMM = 0;
 GRAV_GRAD = 0;
 SOLAR_TORQ = 0;
 DRAG = 0;
 RMM_ESTIMATE = 0;
-
 SAVE_FIG = 0;
-
 
 %-------------------------------ORBITA-------------------------------------
 
@@ -42,16 +40,30 @@ omeg_0 = 2*pi/orb_period;
 eulzxz = [30, 50, 20]'*pi/180;   % converted from degrees to radians
 
 % Attitude in quaternions
-quat = ezxzquat(eulzxz);        % converted from Euler angles
+quat = ezxzquat(eulzxz);% converted from Euler angles
 quat = quat/norm(quat);
 
 % Angular velocity vector in body frame:
-w_ang = [10, 10, 10]'*pi/180;           % in radians/sec
+w_ang = [10, 10, 10]'*pi/180;% in radians/sec
 
 % Initial control torque:
 contq = [0 0 0]';
-    
 
+%--------------------------INIT CLASSES------------------------------------
+
+k_p = 0.02;% ganancia proporcional
+k_v = 10;% ganancia derivativa
+eps = 0.001;% epsilon
+
+% Inertia matrix of axis-symetric rigid body:
+iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];% in kg*m*m
+
+% Inverse inertia matrix:
+invin = inv(iner);
+
+control = controller(k_p, k_v, eps, iner);
+pointing = 0;
+    
 %-----------------------------EFEMERIDES-----------------------------------
 
 % Ephemerides date in Modified Julian date:
@@ -72,22 +84,12 @@ tend = 6*orb_period;    % end time (10 minutes)
 
 %-----------------------------DINAMICA-------------------------------------
 
-% Inertia matrix of axis-symetric rigid body:
-iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];         % in kg*m*m
-%iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
-
-% Inverse inertia matrix:
-invin = inv(iner);
-
-
-
 % Magnetic moment torque flag and moment:
 flag_mag = 1;   % 1=compute magnetic moment / 0=discard magnetic moment
 mag_mom = [0; 0; 0];      % in A.m
 
 % ODE solver precision:
 options = odeset('abstol', 1e-4, 'reltol', 1e-4);
-
 
 %-----------------------VECTORES PARA GRAFICAR-----------------------------
 
@@ -123,7 +125,6 @@ sigma = eye(6);
 %------------------------------SIMULACION----------------------------------
 
 for t = tstart:tstep:tend
-%for t = 1:tstep
 
     % Orbit propagation
     kep2 = kepel + delk*t;
@@ -143,8 +144,6 @@ for t = tstart:tstep:tend
         mom_res = maxmagmom*[0.005; 0.005; -0.005];
     end
     
-    % Peor caso
-    %ambt = 2e-10*[1 1 1]';
     ambt = 0;
     
     % External torques (perturbation)
@@ -160,7 +159,6 @@ for t = tstart:tstep:tend
     if flag_mag == 0
         [T, Y] = ode45('rigbody', tspan, att_vec, options, ext_torq, iner, invin);
     else
-        
         %-----------------------CAMPO MAGNETICO----------------------------
         
         % To convert from inertial state vector to terrestrial vector
@@ -189,18 +187,9 @@ for t = tstart:tstep:tend
             end
         end
 
-        %---------------------CONTROL MAGNETICO----------------------------
-        
-        %k_p = 0.0000003;        % ganancia proporcional
-        k_p = 0.002;
-        %k_v = 0.4;              % ganancia derivativa
-        k_v = 10; 
-        %eps = 0.01;             % epsilon
-        eps = 0.001;
-        
-        %k_p = 0.000005*5/2.2;           % ganancia proporcional
-        %k_v = 0.5*2.2/5;
+        %---------------------CONTROL MAGNETICO---------------------------
 
+        
         dq = quat(1:3);
         dw = w_ang;
         
@@ -210,21 +199,16 @@ for t = tstart:tstep:tend
         dqs = sin(angles/2)*versors;
         dqs4 = cos(angles/2); 
         
-        %if (norm(dw)<0.001 && quat(4)*quat(4)>0.1 && signq4==0) 
-         % signq4=sign(quat(4));
-        %end
         if (norm(dw)<0.001 && dqs4*dqs4>0.1 && signq4==0) 
            signq4=sign(dqs4);
         end
         
-        % Control Derivativo
-        u = - eps*k_v*iner*dw;
-        
         % Sun pointing: término proporcional
         if (eclipse == 0 && signq4*signq4>0)
-            u = u - eps*eps*k_p*inv(iner)*dqs*signq4;
-            %u = u - eps*eps*k_p*dqs*signq4;
+            pointing = 1;
         end
+        
+        u = get_control_action(dq, pointing, signq4, dw, control);
         
         normb2 = norm(earth_field)^2;
 

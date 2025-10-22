@@ -1,0 +1,42 @@
+function [x_corr, sigma_corr] = ekf_rmm(w, rmm, u, iner, earth_field_b, sigma, z, Q, Q_min, R, dt)
+    %Calculo de deriva y jacobianos
+    xdot_hat = [inv(iner)*(cross(u, earth_field_b) + cross(rmm, earth_field_b) - cross(w, iner*w));
+                0;
+                0;
+                0];
+
+    w_skew = Skew(w);
+    Jw = iner*w;
+    Jw_skew = Skew(Jw);
+    B_skew = Skew(earth_field_b);
+    
+    jacfx = [iner\(Jw_skew - w_skew*iner) -inv(iner)*B_skew;
+            zeros(3) zeros(3)];
+    %phikm1 = expm(jacfx*dt)
+    phikm1 = eye(6) + jacfx*dt;
+    
+    jacfu = [-inv(iner)*B_skew; 
+            zeros(3)];
+    gammkm1 = dt*phikm1*jacfu;
+    
+    %Pasito de prediccion
+    x_hat = [w; rmm] + xdot_hat*dt;
+    sigma_hat = phikm1*sigma*phikm1' + gammkm1*Q*gammkm1';
+    
+    %Pasito de correccion
+    H = [eye(3) zeros(3)];
+    
+    K = sigma_hat*H'/(H*sigma_hat*H' + R);
+    
+    x_corr = x_hat + K*(z - H*x_hat);
+    sigma_corr = (eye(6) - K*H)*sigma_hat;
+    
+    Q_avg = 
+    
+    Q = (1 - alpha)*Q + alpha*(Q_min + Q_avg);
+    
+    
+    
+    
+    
+end

@@ -9,7 +9,7 @@
 
 timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
-%---------------------------CONFIGURACIÓN----------------------------------
+%---------------------------CONFIGURACIÃ“N----------------------------------
 
 ECLIPSE = 1;
 RMM = 0;
@@ -18,7 +18,7 @@ SOLAR_TORQ = 0;
 DRAG = 0;
 RMM_ESTIMATE = 0;
 
-SAVE_FIGS = 0;
+SAVE_FIG = 0;
 
 
 %-------------------------------ORBITA-------------------------------------
@@ -67,13 +67,13 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 % Propagation time in seconds:
 tstart = 0;              % initial time (sec)
 tstep = 3;               % step time (sec)
-tend = 10*orb_period;    % end time (10 minutes)
+tend = 6*orb_period;    % end time (10 minutes)
 
 
 %-----------------------------DINAMICA-------------------------------------
 
 % Inertia matrix of axis-symetric rigid body:
-iner = [0.002 0 0; 0 0.002 0; 0 0 0.002];         % in kg*m*m
+iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];         % in kg*m*m
 %iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
 
 % Inverse inertia matrix:
@@ -99,7 +99,7 @@ orbit = stat';          % Orbit elements (state vector)
 keorb = kepel';         % Orbit elements (keplerian)
 
 gamavg = 0*eye(3);      % Gamma avg inicial
-maxmagmom = 0.02;       % Tope momento magnético en Am2
+maxmagmom = 0.02;       % Tope momento magnÃ©tico en Am2
 vdq = [0;0;0];
 vdqs = [0;0;0];
 vdw = [0;0;0];
@@ -118,7 +118,8 @@ Q = 0.01*eye(3);
 R = 0.001*eye(3);
 
 x_pred = [0; 0; 0; 0; 0; 0];
-sigma = eye(6);
+sigma = eye(3)*0.000001^2 zeros(3);
+        zeros(3);
 
 %------------------------------SIMULACION----------------------------------
 
@@ -140,7 +141,7 @@ for t = tstart:tstep:tend
     
     mom_res = 0;
     if RMM == 1
-        mom_res = maxmagmom*0.005;
+        mom_res = maxmagmom*[0.005; 0.005; -0.005];
     end
     
     % Peor caso
@@ -192,11 +193,14 @@ for t = tstart:tstep:tend
         %---------------------CONTROL MAGNETICO----------------------------
         
         %k_p = 0.0000003;        % ganancia proporcional
-        k_p = 0.02;
+        k_p = 0.002;
         %k_v = 0.4;              % ganancia derivativa
         k_v = 10; 
         %eps = 0.01;             % epsilon
         eps = 0.001;
+        
+        %k_p = 0.000005*5/2.2;           % ganancia proporcional
+        %k_v = 0.5*2.2/5;
 
         dq = quat(1:3);
         dw = w_ang;
@@ -217,10 +221,10 @@ for t = tstart:tstep:tend
         % Control Derivativo
         u = - eps*k_v*iner*dw;
         
-        % Sun pointing: término proporcional
+        % Sun pointing: tÃ©rmino proporcional
         if (eclipse == 0 && signq4*signq4>0)
-            %u = u - eps*eps*k_p*inv(iner)*dq*signq4;
-            u = u - eps*eps*k_p*dqs*signq4;
+            u = u - eps*eps*k_p*inv(iner)*dqs*signq4;
+            %u = u - eps*eps*k_p*dqs*signq4;
         end
         
         normb2 = norm(earth_field)^2;
@@ -235,7 +239,7 @@ for t = tstart:tstep:tend
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
         
-        [x_pred, sigma] = ekf_rmm(x_pred(1:3), x_pred(4:6), (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, R, tstep);
+        [x_pred, sigma] = ekf_rmm_adaptative_Q(x_pred(1:3), x_pred(4:6), (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, R, tstep);
         
         %------------------------------------------------------------------
 
@@ -276,7 +280,9 @@ xlabel('Time (orbits)')
 ylabel('Quaternion 1-3')
 title('Attitude in quaternion vector');
 grid on;
-print(gcf, ['Quat' timestamp '.png'], '-dpng')
+if SAVE_FIG == 1
+    print(gcf, ['Quat' timestamp '.png'], '-dpng')
+end
 
 figure(10)
 plot(time/orb_period, vdqs(1,:),'r');hold on;
@@ -295,6 +301,10 @@ plot(time/orb_period, omeg(1,:),'r');hold on;
 plot(time/orb_period, omeg(2,:),'g');hold on;
 plot(time/orb_period, omeg(3,:),'b');hold on;
 plot(time/orb_period,sqrt(omeg(1,:).^2+omeg(2,:).^2+omeg(3,:).^2),'k');hold on;
+xlabel('Time (orbits)')
+ylabel('Angular velocity (rad/s)')
+title('Attitude angular velocity')
+grid on;
 if SAVE_FIG == 1
     print(gcf, ['Velocidad_angular' timestamp '.png'], '-dpng')
 end
@@ -321,7 +331,6 @@ plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 title('Magnetorquers Control Magnetic Moment [Am2]')
 grid on;
-
 if SAVE_FIG == 1
     print(gcf, ['Momento_mag' timestamp '.png'], '-dpng')
 end

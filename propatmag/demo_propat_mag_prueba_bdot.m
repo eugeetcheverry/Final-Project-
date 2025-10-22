@@ -1,4 +1,4 @@
-% demo_propat
+ % demo_propat
 %
 %       Program to show how to use PROPAT
 %       Type demo_propat from the Matlab prompt
