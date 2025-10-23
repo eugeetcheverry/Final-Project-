@@ -17,7 +17,7 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 ECLIPSE = 1;
 RMM = 1;
 GRAV_GRAD = 1;
-SOLAR_TORQ = 0;
+SOLAR_TORQ = 1;
 DRAG = 0;
 
 RMM_ESTIMATE = 1;
@@ -127,6 +127,13 @@ ekf_rmm = rmm_estimator(x_pred, sigma, Q, R, H, Q_min, alpha, iner, controller, 
 
 obs = observability_calculator(H, 10);
 
+%------------------------------PRESION SOLAR------------------------------
+
+T_sun = 5.772e3; %Kelvin
+S_sat = 0.01; %m^2 superficie la cual le da el sol
+C_r = 1; %Coeficiente de relexion del satelite
+r_cp = [0.001 0 0];%Distancia del centro de masas al centro de presion
+
 %-----------------------VECTORES PARA GRAFICAR-----------------------------
 
 % Initial vectors
@@ -227,14 +234,9 @@ for t = tstart:tstep:tend
         %---------------------CONTROL MAGNETICO----------------------------
         
         
-        %k_p = 0.0000003;        % ganancia proporcional
-        k_p = 0.000025;
-        %k_v = 0.4;              % ganancia derivativa
-        k_v = 0.3; 
-        eps = 0.01;             % epsilon
-        %eps = 0.001;
-        %k_p = 0.000005*5/2.2;           % ganancia proporcional
-        %k_v = 0.5*2.2/5;
+        k_p = 0.00025;% ganancia proporcional
+        k_v = 0.3; % ganancia derivativa
+        eps = 0.01;% epsilon
 
         dq = quat(1:3);
         dw = w_ang;
@@ -246,9 +248,6 @@ for t = tstart:tstep:tend
         dqs = sin(angles/2)*versors;
         dqs4 = cos(angles/2); 
         
-        %if (norm(dw)<0.001 && quat(4)*quat(4)>0.1 && signq4==0) 
-         % signq4=sign(quat(4));
-        %end
         if (norm(dw)<0.001 && dqs4*dqs4>0.1 && signq4==0) 
            signq4=sign(dqs4);
         end
@@ -280,18 +279,30 @@ for t = tstart:tstep:tend
 
         mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res - RMM_COMPENSATE*x_pred(4:6);
         
+        
         if max(abs(mag_mom)) > maxmagmom             % torqrod saturation with bisection
           mag_mom = mag_mom*maxmagmom/max(abs(mag_mom));
         end
         
         ext_torq = ext_torq + cross(mag_mom, earth_field_b);
         
+        %---------------------MOMENTO SOLAR----------------------------
+        
+        sun_torq = 0;
+        if (SOLAR_TORQ == 1 && eclipse == 0)
+            s_eci = sun_dir(mjd, dfra + t); % sun vector en ECI
+            R_bi = quatrmx(quat); %Convertir a body frame usando la matriz de rotación
+            v_sun_body = R_bi * s_eci(:); %sun vector en body
+            sun_torq = solar_pressure(v_sun_body, T_sun, S_sat, r_cp, C_r);
+        end
+        ext_torq = ext_torq + sun_torq';
+        
         %-------------------------OBSERVABILIDAD---------------------------
 
         obs = update(obs, phik);
         
-        M = get_M(obs);
-        detM = log10(svds(M, 1, 'smallest'));
+        M_gram = get_M(obs);
+        sing_M_gram = log10(svds(M_gram, 1, 'smallest'));
         
         %------------------------------------------------------------------
         
@@ -322,7 +333,7 @@ for t = tstart:tstep:tend
     vdw_hat = [vdw_hat x_pred(1:3)];
     vrmm_diag_cov = [vrmm_diag_cov rmm_avas];
     vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
-    vdetM = [vdetM; detM];
+    vdetM = [vdetM; sing_M_gram];
 
 end
 
