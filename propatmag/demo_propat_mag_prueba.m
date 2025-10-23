@@ -85,8 +85,6 @@ iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];         % in kg*m*m
 % Inverse inertia matrix:
 invin = inv(iner);
 
-
-
 % Magnetic moment torque flag and moment:
 flag_mag = 1;   % 1=compute magnetic moment / 0=discard magnetic moment
 mag_mom = [0; 0; 0];      % in A.m
@@ -158,8 +156,6 @@ vdw_hat = [0;0;0];
 vrmm_diag_cov = [sigma(4,4); sigma(5,5); sigma(6,6)];
 vQ = [Q(4,4); Q(5,5); Q(6,6)];
 vdetM = 0;
-
-
 
 %------------------------------SIMULACION----------------------------------
 
@@ -291,8 +287,7 @@ for t = tstart:tstep:tend
         sun_torq = 0;
         if (SOLAR_TORQ == 1 && eclipse == 0)
             s_eci = sun_dir(mjd, dfra + t); % sun vector en ECI
-            R_bi = quatrmx(quat); %Convertir a body frame usando la matriz de rotación
-            v_sun_body = R_bi * s_eci(:); %sun vector en body
+            v_sun_body = quatrmx(quat) * s_eci(:); %sun vector en body
             sun_torq = solar_pressure(v_sun_body, T_sun, S_sat, r_cp, C_r);
         end
         ext_torq = ext_torq + sun_torq';
