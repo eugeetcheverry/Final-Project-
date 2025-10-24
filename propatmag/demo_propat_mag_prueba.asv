@@ -85,8 +85,6 @@ iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];         % in kg*m*m
 % Inverse inertia matrix:
 invin = inv(iner);
 
-
-
 % Magnetic moment torque flag and moment:
 flag_mag = 1;   % 1=compute magnetic moment / 0=discard magnetic moment
 mag_mom = [0; 0; 0];      % in A.m
@@ -125,14 +123,18 @@ ekf_rmm = rmm_estimator(x_pred, sigma, Q, R, H, Q_min, alpha, iner, controller, 
 
 %------------------------------OBSERVABILIDAD------------------------------
 
-obs = observability_calculator(H, 10);
+obs_1 = observability_calculator(H, 2);
+obs_2 = observability_calculator(H, 3);
+obs_5 = observability_calculator(H, 5);
+obs_10 = observability_calculator(H, 10);
+obs_50 = observability_calculator(H, 50);
 
 %------------------------------PRESION SOLAR------------------------------
 
 T_sun = 5.772e3; %Kelvin
 S_sat = 0.01; %m^2 superficie la cual le da el sol
 C_r = 1; %Coeficiente de relexion del satelite
-r_cp = [0.01 0 0];%Distancia del centro de masas al centro de presion
+r_cp = [0.001 0 0];%Distancia del centro de masas al centro de presion
 
 %-----------------------VECTORES PARA GRAFICAR-----------------------------
 
@@ -157,9 +159,11 @@ vrmm_hat = [0;0;0];
 vdw_hat = [0;0;0];
 vrmm_diag_cov = [sigma(4,4); sigma(5,5); sigma(6,6)];
 vQ = [Q(4,4); Q(5,5); Q(6,6)];
-vdetM = 0;
-
-
+vsingularM_1 = 0;
+vsingularM_2 = 0;
+vsingularM_5 = 0;
+vsingularM_10 = 0;
+vsingularM_50 = 0;
 
 %------------------------------SIMULACION----------------------------------
 
@@ -234,14 +238,9 @@ for t = tstart:tstep:tend
         %---------------------CONTROL MAGNETICO----------------------------
         
         
-        %k_p = 0.0000003;        % ganancia proporcional
-        k_p = 0.00025;
-        %k_v = 0.4;              % ganancia derivativa
-        k_v = 0.9; 
-        eps = 0.01;             % epsilon
-        %eps = 0.001;
-        %k_p = 0.000005*5/2.2;           % ganancia proporcional
-        %k_v = 0.5*2.2/5;
+        k_p = 0.00025;% ganancia proporcional
+        k_v = 0.3; % ganancia derivativa
+        eps = 0.01;% epsilon
 
         dq = quat(1:3);
         dw = w_ang;
@@ -293,20 +292,34 @@ for t = tstart:tstep:tend
         
         %---------------------MOMENTO SOLAR----------------------------
         
-        s_eci = sun_dir(mjd, dfra + t);    % sun vector en ECI
-        % Convertir a body frame usando la matriz de rotación
-        R_bi = quatrmx(quat); 
-        v_sun_body = R_bi * s_eci(:); %sun vector en body
+        sun_torq = 0;
         if (SOLAR_TORQ == 1 && eclipse == 0)
-            sun_torq = solar_pressure(v_sun_body, T_sun, S_sat, r_cp, C_r);
-            ext_torq = ext_torq + sun_torq';
+            s_eci = sun_dir(mjd, dfra + t); % sun vector en ECI
+            v_sun_body = quatrmx(quat) * s_eci(:); %sun vector en body
+            norm_sun = norm(v_sun_body);
+            r_presion = (v_sun_body/norm_sun)*0.001;
+            [F_sun, sun_torq] = solar_pressure(v_sun_body, T_sun, S_sat, r_presion', C_r);
         end
+        ext_torq = ext_torq + sun_torq';
+        
         %-------------------------OBSERVABILIDAD---------------------------
 
-        obs = update(obs, phik);
+        obs_1 = update(obs_1, phik);
+        obs_2 = update(obs_2, phik);
+        obs_5 = update(obs_5, phik);
+        obs_10 = update(obs_10, phik);
+        obs_50 = update(obs_50, phik);
         
-        M_gram = get_M(obs);
-        sing_M_gram = log10(svds(M_gram, 1, 'smallest'));
+        M_gram_1 = get_M(obs_1);
+        M_gram_2 = get_M(obs_2);
+        M_gram_5 = get_M(obs_5);
+        M_gram_10 = get_M(obs_10);
+        M_gram_50 = get_M(obs_50);
+        sing_M_gram_1 = log10(svds(M_gram_1, 1, 'smallest'));
+        sing_M_gram_2 = log10(svds(M_gram_2, 1, 'smallest'));
+        sing_M_gram_5 = log10(svds(M_gram_5, 1, 'smallest'));
+        sing_M_gram_10 = log10(svds(M_gram_10, 1, 'smallest'));
+        sing_M_gram_50 = log10(svds(M_gram_50, 1, 'smallest'));
         
         %------------------------------------------------------------------
         
@@ -337,7 +350,11 @@ for t = tstart:tstep:tend
     vdw_hat = [vdw_hat x_pred(1:3)];
     vrmm_diag_cov = [vrmm_diag_cov rmm_avas];
     vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
-    vdetM = [vdetM; sing_M_gram];
+    vsingularM_1 = [vsingularM_1; sing_M_gram_1];
+    vsingularM_2 = [vsingularM_2; sing_M_gram_2];
+    vsingularM_5 = [vsingularM_5; sing_M_gram_5];
+    vsingularM_10 = [vsingularM_10; sing_M_gram_10];
+    vsingularM_50 = [vsingularM_50; sing_M_gram_50];
 
 end
 
@@ -439,8 +456,12 @@ if SAVE_FIG == 1
 end
 
 figure(26);clf;
-plot(time/orb_period,vdetM,'r');hold on;
-title('Determinant of M')
+plot(time/orb_period,vsingularM_1);hold on;
+plot(time/orb_period,vsingularM_2);hold on;
+plot(time/orb_period,vsingularM_5);hold on;
+plot(time/orb_period,vsingularM_10);hold on;
+plot(time/orb_period,vsingularM_50);hold on;
+title('Minimum singular value of M')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')

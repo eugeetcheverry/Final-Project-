@@ -12,7 +12,7 @@ classdef observability_calculator
         end
         
         function obj = update(obj, Phik)
-            if size(obj.Phiks,2) < (obj.N - 2)
+            if size(obj.Phiks,2) < (obj.N - 1)
                 obj.Phiks{end+1} = Phik;
             else
                 obj.Phiks = obj.Phiks(2:end);
@@ -21,10 +21,12 @@ classdef observability_calculator
         end
         
         function O = get_O(obj)
-            if size(obj.Phiks,2) == (obj.N-2)
+            if obj.N == 1
+                O = obj.H;
+            elseif size(obj.Phiks,2) == (obj.N-1)
                 O = obj.H;
                 newmat = obj.H;
-                for i = 1:(obj.N-2)
+                for i = 1:(obj.N-1)
                     newmat = newmat*obj.Phiks{i};
                     O = [O ; newmat];
                 end
