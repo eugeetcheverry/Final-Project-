@@ -288,7 +288,10 @@ for t = tstart:tstep:tend
         if (SOLAR_TORQ == 1 && eclipse == 0)
             s_eci = sun_dir(mjd, dfra + t); % sun vector en ECI
             v_sun_body = quatrmx(quat) * s_eci(:); %sun vector en body
-            sun_torq = solar_pressure(v_sun_body, T_sun, S_sat, r_cp, C_r);
+            norm_sun = norm(v_sun_body);
+            r_presion = (v_sun_body/norm_sun)*0.001;
+            [F_sun, sun_torq] = solar_pressure(v_sun_body, T_sun, S_sat, r_presion', C_r);
+            F_sun
         end
         ext_torq = ext_torq + sun_torq';
         
