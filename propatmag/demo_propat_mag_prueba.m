@@ -14,17 +14,18 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
 %---------------------------CONFIGURACIÓN----------------------------------
 
-ECLIPSE = 0;
-RMM = 0;
-GRAV_GRAD = 0;
-SOLAR_TORQ = 0;
+ECLIPSE = 1;
+RMM = 1;
+GRAV_GRAD = 1;
+SOLAR_TORQ = 1;
 DRAG = 0;
+J_DIAGONAL = 0;
 
-SUN_POINTING = 0;
+SUN_POINTING = 1;
 
-RMM_ESTIMATE = 0;
-RMM_COMPENSATE = 0;
-Q_ESTIMATE = 0;
+RMM_ESTIMATE = 1;
+RMM_COMPENSATE = 1;
+Q_ESTIMATE = 1;
 
 SAVE_FIG = 0;
 
@@ -75,13 +76,17 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 % Propagation time in seconds:
 tstart = 0;              % initial time (sec)
 tstep = 2;               % step time (sec)
-tend = 6*orb_period;    % end time (10 minutes)
+tend = 10*orb_period;    % end time (10 minutes)
 
 
 %-----------------------------DINAMICA-------------------------------------
 
 % Inertia matrix of axis-symetric rigid body:
-iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];         % in kg*m*m
+iner = [0.0021 1e-6 -1e-6; 1e-6 0.0018 -1e-7; -1e-6 -1e-7 0.002];
+if J_DIAGONAL
+    iner = [0.0021 0 0; 0 0.0018 0; 0 0 0.002];
+end
+         % in kg*m*m
 %iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
 
 % Inverse inertia matrix:
@@ -166,6 +171,7 @@ vsingularM_2 = 0;
 vsingularM_5 = 0;
 vsingularM_10 = 0;
 vsingularM_50 = 0;
+vsun_torq = 0;
 
 %------------------------------SIMULACION----------------------------------
 
@@ -359,6 +365,7 @@ for t = tstart:tstep:tend
     vsingularM_5 = [vsingularM_5; sing_O_5];
     vsingularM_10 = [vsingularM_10; sing_O_10];
     vsingularM_50 = [vsingularM_50; sing_O_50];
+    vsun_torq = [vsun_torq; sun_torq'];
 
 end
 
@@ -415,7 +422,9 @@ plot(time/orb_period,vmag_mom(2,:),'g');hold on;
 plot(time/orb_period,vmag_mom(3,:),'b');hold on;
 plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Magnetorquers Control Magnetic Moment [Am2]')
+title('Magnetorquers Control Magnetic Moment')
+xlabel('Time (orbits)')
+ylabel('Magnetic Moment (Am^2)')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Momento_mag' timestamp '.png'], '-dpng')
@@ -427,7 +436,9 @@ plot(time/orb_period,vrmm_hat(2,:),'g');hold on;
 plot(time/orb_period,vrmm_hat(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Estimated RMM [Am2]')
+title('Estimated RMM')
+xlabel('Time (orbits)')
+ylabel('Magnetic Moment (Am^2)')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['RMM_hat' timestamp '.png'], '-dpng')
@@ -440,7 +451,8 @@ plot(time/orb_period,vrmm_diag_cov(2,:),'g');hold on;
 plot(time/orb_period,vrmm_diag_cov(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Covariance od estimated RMM [Am2]')
+title('Eigenvalues of Estimated RMM Covariance')
+xlabel('Time (orbits)')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
@@ -454,6 +466,7 @@ plot(time/orb_period,vQ(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 title('Estimated Q [Am2]')
+xlabel('Time (orbits)')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
@@ -465,8 +478,22 @@ plot(time/orb_period,vsingularM_2);hold on;
 plot(time/orb_period,vsingularM_5);hold on;
 plot(time/orb_period,vsingularM_10);hold on;
 plot(time/orb_period,vsingularM_50);hold on;
-legend('$O_1$', '$O_2$', '$O_5$', '$O_{10}$', '$O_{50}$' )
+legend('$O_1$', '$O_2$', '$O_5$', '$O_{10}$', '$O_{50}$' ,'Interpreter', 'latex')
 title('Minimum singular values of $O_{\tau}$', 'Interpreter', 'latex')
+xlabel('Time (orbits)')
+grid on;
+if SAVE_FIG == 1
+    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
+end
+
+figure(27);clf;
+plot(time/orb_period,vsun_torq(1,:),'r');hold on;
+plot(time/orb_period,vsun_torq(2,:),'g');hold on;
+plot(time/orb_period,vsun_torq(3,:),'b');hold on;
+%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+title('Sun torque [Nm]')
+xlabel('Time (orbits)')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')

@@ -12,16 +12,13 @@ clc
 
 timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
-%---------------------------CONFIGURACIÓN----------------------------------
+%---------------------------CONFIGURACIÃ“N----------------------------------
 
-ECLIPSE = 0;
-RMM = 0;
-GRAV_GRAD = 0;
-SOLAR_TORQ = 0;
+ECLIPSE = 1;
+RMM = 1;
+GRAV_GRAD = 1;
+SOLAR_TORQ = 1;
 DRAG = 0;
-J_DIAGONAL = 0;
-
-SUN_POINTING = 0;
 
 RMM_ESTIMATE = 1;
 RMM_COMPENSATE = 1;
@@ -82,11 +79,7 @@ tend = 10*orb_period;    % end time (10 minutes)
 %-----------------------------DINAMICA-------------------------------------
 
 % Inertia matrix of axis-symetric rigid body:
-iner = [0.0022 1e-6 -1e-6; 1e-6 0.0019 -1e-7; -1e-6 -1e-7 0.0021];
-if J_DIAGONAL
-    iner = [0.0022 0 0; 0 0.0019 0; 0 0 0.0022];
-end
-         % in kg*m*m
+iner = [0.0022 0 0; 0 0.0022 0; 0 0 0.0022];         % in kg*m*m
 %iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
 
 % Inverse inertia matrix:
@@ -153,7 +146,7 @@ orbit = stat';          % Orbit elements (state vector)
 keorb = kepel';         % Orbit elements (keplerian)
 
 gamavg = 0*eye(3);      % Gamma avg inicial
-maxmagmom = 0.02;       % Tope momento magnético en Am2
+maxmagmom = 0.02;       % Tope momento magnÃ©tico en Am2
 vdq = [0;0;0];
 vdqs = [0;0;0];
 vdw = [0;0;0];
@@ -266,8 +259,8 @@ for t = tstart:tstep:tend
         % Control Derivativo
         %u = - eps*k_v*iner*dw;
         pointing = 0;
-        % Sun pointing: término proporcional
-        if (eclipse == 0 && signq4*signq4>0 && SUN_POINTING)
+        % Sun pointing: tÃ©rmino proporcional
+        if (eclipse == 0 && signq4*signq4>0)
             pointing = 1;
             %u = u - eps*eps*k_p*inv(iner)*dqs*signq4;
             %u = u - eps*eps*k_p*dqs*signq4;
@@ -277,8 +270,6 @@ for t = tstart:tstep:tend
         
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
-        phik = 0;
-        rmm_avas = [0;0;0];
         if RMM_ESTIMATE == 1
             %[x_pred, sigma, phikm1, Q] = ekf_rmm(x_pred, (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, Q_min, alpha, R, tstep);
             [ekf_rmm, phik] = update(ekf_rmm, mag_mom - mom_res, earth_field_b, dw);
@@ -286,7 +277,7 @@ for t = tstart:tstep:tend
             avas_sigma = eig(sigma);
             rmm_avas = avas_sigma(4:6);
         end
-        %---------------------MOMENTO MAGNÉTICO----------------------------
+        %---------------------MOMENTO MAGNÃ‰TICO----------------------------
         
         normb2 = norm(earth_field)^2;
 
@@ -319,16 +310,16 @@ for t = tstart:tstep:tend
         obs_10 = update(obs_10, phik);
         obs_50 = update(obs_50, phik);
         
-        O_1 = get_M(obs_1);
-        O_2 = get_M(obs_2);
-        O_5 = get_M(obs_5);
-        O_10 = get_M(obs_10);
-        O_50 = get_M(obs_50);
-        sing_O_1 = log10(svds(O_1, 1, 'smallest'));
-        sing_O_2 = log10(svds(O_2, 1, 'smallest'));
-        sing_O_5 = log10(svds(O_5, 1, 'smallest'));
-        sing_O_10 = log10(svds(O_10, 1, 'smallest'));
-        sing_O_50 = log10(svds(O_50, 1, 'smallest'));
+        M_gram_1 = get_M(obs_1);
+        M_gram_2 = get_M(obs_2);
+        M_gram_5 = get_M(obs_5);
+        M_gram_10 = get_M(obs_10);
+        M_gram_50 = get_M(obs_50);
+        sing_M_gram_1 = log10(svds(M_gram_1, 1, 'smallest'));
+        sing_M_gram_2 = log10(svds(M_gram_2, 1, 'smallest'));
+        sing_M_gram_5 = log10(svds(M_gram_5, 1, 'smallest'));
+        sing_M_gram_10 = log10(svds(M_gram_10, 1, 'smallest'));
+        sing_M_gram_50 = log10(svds(M_gram_50, 1, 'smallest'));
         
         %------------------------------------------------------------------
         
@@ -359,11 +350,11 @@ for t = tstart:tstep:tend
     vdw_hat = [vdw_hat x_pred(1:3)];
     vrmm_diag_cov = [vrmm_diag_cov rmm_avas];
     vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
-    vsingularM_1 = [vsingularM_1; sing_O_1];
-    vsingularM_2 = [vsingularM_2; sing_O_2];
-    vsingularM_5 = [vsingularM_5; sing_O_5];
-    vsingularM_10 = [vsingularM_10; sing_O_10];
-    vsingularM_50 = [vsingularM_50; sing_O_50];
+    vsingularM_1 = [vsingularM_1; sing_M_gram_1];
+    vsingularM_2 = [vsingularM_2; sing_M_gram_2];
+    vsingularM_5 = [vsingularM_5; sing_M_gram_5];
+    vsingularM_10 = [vsingularM_10; sing_M_gram_10];
+    vsingularM_50 = [vsingularM_50; sing_M_gram_50];
 
 end
 
@@ -420,9 +411,7 @@ plot(time/orb_period,vmag_mom(2,:),'g');hold on;
 plot(time/orb_period,vmag_mom(3,:),'b');hold on;
 plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Magnetorquers Control Magnetic Moment')
-xlabel('Time (orbits)')
-ylabel('Magnetic Moment (Am^2)')
+title('Magnetorquers Control Magnetic Moment [Am2]')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Momento_mag' timestamp '.png'], '-dpng')
@@ -434,9 +423,7 @@ plot(time/orb_period,vrmm_hat(2,:),'g');hold on;
 plot(time/orb_period,vrmm_hat(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Estimated RMM')
-xlabel('Time (orbits)')
-ylabel('Magnetic Moment (Am^2)')
+title('Estimated RMM [Am2]')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['RMM_hat' timestamp '.png'], '-dpng')
@@ -449,7 +436,7 @@ plot(time/orb_period,vrmm_diag_cov(2,:),'g');hold on;
 plot(time/orb_period,vrmm_diag_cov(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Eovariance of estimated RMM')
+title('Covariance od estimated RMM [Am2]')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
@@ -474,8 +461,7 @@ plot(time/orb_period,vsingularM_2);hold on;
 plot(time/orb_period,vsingularM_5);hold on;
 plot(time/orb_period,vsingularM_10);hold on;
 plot(time/orb_period,vsingularM_50);hold on;
-legend('$O_1$', '$O_2$', '$O_5$', '$O_{10}$', '$O_{50}$' )
-title('Minimum singular values of $O_{\tau}$', 'Interpreter', 'latex')
+title('Minimum singular value of M')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
