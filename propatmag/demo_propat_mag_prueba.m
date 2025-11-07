@@ -171,7 +171,7 @@ vsingularM_2 = 0;
 vsingularM_5 = 0;
 vsingularM_10 = 0;
 vsingularM_50 = 0;
-vsun_torq = 0;
+vsun_torq = [0; 0; 0];
 
 %------------------------------SIMULACION----------------------------------
 
@@ -302,7 +302,7 @@ for t = tstart:tstep:tend
         
         %---------------------MOMENTO SOLAR----------------------------
         
-        sun_torq = 0;
+        sun_torq = [0 0 0];
         if (SOLAR_TORQ == 1 && eclipse == 0)
             s_eci = sun_dir(mjd, dfra + t); % sun vector en ECI
             v_sun_body = quatrmx(quat) * s_eci(:); %sun vector en body
@@ -365,7 +365,7 @@ for t = tstart:tstep:tend
     vsingularM_5 = [vsingularM_5; sing_O_5];
     vsingularM_10 = [vsingularM_10; sing_O_10];
     vsingularM_50 = [vsingularM_50; sing_O_50];
-    vsun_torq = [vsun_torq; sun_torq'];
+    vsun_torq = [vsun_torq sun_torq'];
 
 end
 
