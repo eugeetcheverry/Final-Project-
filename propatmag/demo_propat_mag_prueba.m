@@ -16,16 +16,16 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
 ECLIPSE = 1;
 RMM = 1;
-GRAV_GRAD = 1;
-SOLAR_TORQ = 1;
+GRAV_GRAD = 0;
+SOLAR_TORQ = 0;
 DRAG = 0;
 J_DIAGONAL = 0;
 
 SUN_POINTING = 1;
 
-RMM_ESTIMATE = 1;
-RMM_COMPENSATE = 1;
-Q_ESTIMATE = 1;
+RMM_ESTIMATE = 0;
+RMM_COMPENSATE = 0;
+Q_ESTIMATE = 0;
 
 SAVE_FIG = 0;
 
@@ -153,7 +153,7 @@ orbit = stat';          % Orbit elements (state vector)
 keorb = kepel';         % Orbit elements (keplerian)
 
 gamavg = 0*eye(3);      % Gamma avg inicial
-maxmagmom = 0.02;       % Tope momento magnético en Am2
+maxmagmom = 0.1;       % Tope momento magnético en Am2
 vdq = [0;0;0];
 vdqs = [0;0;0];
 vdw = [0;0;0];
@@ -172,6 +172,7 @@ vsingularM_5 = 0;
 vsingularM_10 = 0;
 vsingularM_50 = 0;
 vsun_torq = [0; 0; 0];
+vrmm_torq = [0; 0; 0];
 
 %------------------------------SIMULACION----------------------------------
 
@@ -196,7 +197,7 @@ for t = tstart:tstep:tend
         mom_res = maxmagmom*[0.005; 0.005; -0.005];
     end
     
-    % Peor caso
+    %Peor caso
     %ambt = 2e-10*[1 1 1]';
     ambt = 0;
     
@@ -359,6 +360,7 @@ for t = tstart:tstep:tend
     vrmm_hat = [vrmm_hat x_pred(4:6)];
     vdw_hat = [vdw_hat x_pred(1:3)];
     vrmm_diag_cov = [vrmm_diag_cov rmm_avas];
+    vrmm_torq = [vrmm_torq cross(mom_res, earth_field_b)];
     vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
     vsingularM_1 = [vsingularM_1; sing_O_1];
     vsingularM_2 = [vsingularM_2; sing_O_2];
@@ -493,6 +495,19 @@ plot(time/orb_period,vsun_torq(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 title('Sun torque [Nm]')
+xlabel('Time (orbits)')
+grid on;
+if SAVE_FIG == 1
+    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
+end
+
+figure(27);clf;
+plot(time/orb_period,vrmm_torq(1,:),'r');hold on;
+plot(time/orb_period,vrmm_torq(2,:),'g');hold on;
+plot(time/orb_period,vrmm_torq(3,:),'b');hold on;
+%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+title('RMM torque [Nm]')
 xlabel('Time (orbits)')
 grid on;
 if SAVE_FIG == 1
