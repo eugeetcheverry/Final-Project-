@@ -24,9 +24,9 @@ J_DIAGONAL = 0;
 SUN_POINTING = 0;
 NADIR_POINTING = 1;
 
-RMM_ESTIMATE = 0;
-RMM_COMPENSATE = 0;
-Q_ESTIMATE = 0;
+RMM_ESTIMATE = 1;
+RMM_COMPENSATE = 1;
+Q_ESTIMATE = 1;
 
 SAVE_FIG = 0;
 
@@ -193,7 +193,7 @@ for t = tstart:tstep:tend
         grad_grav = 3*omeg_0^2*cross(exb,iner*exb);
     end
     
-    mom_res = 0;
+    mom_res = [0; 0; 0];
     if RMM == 1
         mom_res = maxmagmom*[0.005; 0.005; -0.005];
     end
@@ -247,40 +247,51 @@ for t = tstart:tstep:tend
 
         %---------------------CONTROL MAGNETICO----------------------------
         
-        
-        k_p = 0.00025;% ganancia proporcional
-        k_v = 0.3; % ganancia derivativa
-        eps = 0.01;% epsilon
 
         dq = quat(1:3);
         dw = w_ang;
         
+        % Error en base al modo
         if SUN_POINTING
             dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
-        else 
-            if NADIR_POINTING
-                dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;1]);
-            end
+        end
+        if NADIR_POINTING
+            dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
         end
         angles = asin(norm(dqs));
         versors = dqs/norm(dqs);
         dqs = sin(angles/2)*versors;
         dqs4 = cos(angles/2); 
-        
-        if (norm(dw)<0.001 && dqs4*dqs4>0.1 && signq4==0) 
+
+        % Marcar fin del detumbling
+        if (norm(dw)<0.0005 && dqs4*dqs4>0.1 && signq4==0) 
            signq4=sign(dqs4);
         end
-        
-        % Control Derivativo
-        %u = - eps*k_v*iner*dw;
+
+        % Acualizar ganancias según el modo
+        if SUN_POINTING && signq4*signq4>0
+            k_p = 0.000025;% ganancia proporcional
+            k_v = 0.3; % ganancia derivativa
+            if eclipse 
+                eps = 0.03;% epsilon
+            else
+                eps = 0.01;% epsilon
+            end
+        end 
+        if NADIR_POINTING && signq4*signq4>0
+            k_p = 0.000025;% ganancia proporcional
+            k_v = 0.3; % ganancia derivativa
+            eps = 0.02;%epsilon
+        end
+        controller = update(controller, k_v, k_p, eps);
+
+        % Determinar apuntamiento
         pointing = 0;
-        % Sun pointing: término proporcional
         if (((eclipse == 0 && SUN_POINTING) || NADIR_POINTING) && signq4*signq4>0)
             pointing = 1;
-            %u = u - eps*eps*k_p*inv(iner)*dqs*signq4;
-            %u = u - eps*eps*k_p*dqs*signq4;
         end
         
+        % Generar acción de control
         u = get_control_action(controller, dqs, signq4, dw, pointing);
         
         

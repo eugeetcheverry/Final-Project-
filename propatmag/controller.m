@@ -19,8 +19,10 @@ classdef controller
             eps = obj.eps;
         end
         
-        function obj = k_v_update(obj, k_v)
+        function obj = update(obj, k_v, k_p, eps)
             obj.k_v = k_v;
+            obj.eps = eps;
+            obj.k_p = k_p;
         end
         function u = get_control_action(obj, dq, signq4, dw, pointing)
             
