@@ -21,7 +21,8 @@ SOLAR_TORQ = 0;
 DRAG = 0;
 J_DIAGONAL = 0;
 
-SUN_POINTING = 1;
+SUN_POINTING = 0;
+NADIR_POINTING = 1;
 
 RMM_ESTIMATE = 0;
 RMM_COMPENSATE = 0;
@@ -254,8 +255,13 @@ for t = tstart:tstep:tend
         dq = quat(1:3);
         dw = w_ang;
         
-        dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
-        %dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;1])
+        if SUN_POINTING
+            dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
+        else 
+            if NADIR_POINTING
+                dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;1]);
+            end
+        end
         angles = asin(norm(dqs));
         versors = dqs/norm(dqs);
         dqs = sin(angles/2)*versors;
@@ -269,7 +275,7 @@ for t = tstart:tstep:tend
         %u = - eps*k_v*iner*dw;
         pointing = 0;
         % Sun pointing: término proporcional
-        if (eclipse == 0 && signq4*signq4>0 && SUN_POINTING)
+        if (((eclipse == 0 && SUN_POINTING) || NADIR_POINTING) && signq4*signq4>0)
             pointing = 1;
             %u = u - eps*eps*k_p*inv(iner)*dqs*signq4;
             %u = u - eps*eps*k_p*dqs*signq4;
