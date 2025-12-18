@@ -434,7 +434,7 @@ if SAVE_FIG == 1
 end
 hold on;
 
-
+%a
 figure(22);clf;
 plot(time/orb_period,vmag_mom(1,:),'r');hold on;
 plot(time/orb_period,vmag_mom(2,:),'g');hold on;
