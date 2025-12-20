@@ -33,7 +33,7 @@ SAVE_FIG = 0;
 
 %-------------------------------ORBITA-------------------------------------
 
-kepel = [7000000, 0.01, 95*pi/180, 0, 0, 0];
+kepel = [4000000, 0.01, 90*pi/180, 0, 0, 0];
 
 % Orbit state vector:
 stat = kepel_statvec(kepel);
@@ -60,7 +60,8 @@ w_ang = [10, 10, 10]'*pi/180;           % in radians/sec
 
 % Initial control torque:
 contq = [0 0 0]';
-    
+angles = 0;
+angles_ = 0;
 
 %-----------------------------EFEMERIDES-----------------------------------
 
@@ -174,6 +175,7 @@ vsingularM_10 = 0;
 vsingularM_50 = 0;
 vsun_torq = [0; 0; 0];
 vrmm_torq = [0; 0; 0];
+vdqs_true = [0; 0; 0];
 
 %------------------------------SIMULACION----------------------------------
 
@@ -245,6 +247,13 @@ for t = tstart:tstep:tend
             end
         end
 
+        %-------------------------HORIZONTE--------------------------------
+
+        no_horizon = 0;
+        if angles_ > pi/4 || angles_ < -pi/4
+            no_horizon = 1;
+        end
+
         %---------------------CONTROL MAGNETICO----------------------------
         
 
@@ -254,14 +263,30 @@ for t = tstart:tstep:tend
         % Error en base al modo
         if SUN_POINTING
             dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
+            angles = asin(norm(dqs));
+            versors = dqs/norm(dqs);
+            dqs = sin(angles/2)*versors;
+            dqs4 = cos(angles/2); 
+        end
+        if NADIR_POINTING && no_horizon==0
+            dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
+            angles = asin(norm(dqs));
+            versors = dqs/norm(dqs);
+            dqs = sin(angles/2)*versors;
+            dqs4 = cos(angles/2); 
+        end
+
+
+        if SUN_POINTING 
+            dqs_true = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
         end
         if NADIR_POINTING
-            dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
+            dqs_true = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
         end
-        angles = asin(norm(dqs));
-        versors = dqs/norm(dqs);
-        dqs = sin(angles/2)*versors;
-        dqs4 = cos(angles/2); 
+        angles_ = asin(norm(dqs_true));
+        versors_ = dqs_true/norm(dqs_true);
+        dqs_true = sin(angles_/2)*versors_; 
+       
 
         % Marcar fin del detumbling
         if (norm(dw)<0.0005 && dqs4*dqs4>0.1 && signq4==0) 
@@ -279,15 +304,21 @@ for t = tstart:tstep:tend
             end
         end 
         if NADIR_POINTING && signq4*signq4>0
-            k_p = 0.000025;% ganancia proporcional
-            k_v = 0.3; % ganancia derivativa
-            eps = 0.02;%epsilon
+            if no_horizon
+                k_p = 0.0000025;% ganancia proporcional
+                k_v = 0.4; % ganancia derivativa
+                eps = 0.01;%epsilon
+            else
+                k_p = 0.000025;% ganancia proporcional
+                k_v = 0.3; % ganancia derivativa
+                eps = 0.02;%epsilon
+            end
         end
         controller = update(controller, k_v, k_p, eps);
 
         % Determinar apuntamiento
         pointing = 0;
-        if (((eclipse == 0 && SUN_POINTING) || NADIR_POINTING) && signq4*signq4>0)
+        if (((eclipse == 0 && SUN_POINTING) || (NADIR_POINTING)) && signq4*signq4>0)
             pointing = 1;
         end
         
@@ -353,6 +384,7 @@ for t = tstart:tstep:tend
         
         [T, Y] = ode45('rigbody', tspan, att_vec, options, ext_torq, iner, invin, ...
             mag_mom, earth_field);
+
     end
     
     t
@@ -371,6 +403,7 @@ for t = tstart:tstep:tend
     keorb = cat(2, keorb, kep2');
     vdq = [vdq dq];
     vdqs = [vdqs dqs];
+    vdqs_true = [vdqs_true dqs_true];
     vdw = [vdw dw]; 
     vmag_mom = [vmag_mom mag_mom];
     vext_torq = [vext_torq ext_torq];
@@ -404,9 +437,12 @@ if SAVE_FIG == 1
 end
 
 figure(10)
-plot(time/orb_period, vdqs(1,:),'r');hold on;
-plot(time/orb_period, vdqs(2,:),'g');hold on;
-plot(time/orb_period, vdqs(3,:),'b');hold on;
+plot(time/orb_period, vdqs(1,:),'r--');hold on;
+plot(time/orb_period, vdqs(2,:),'g--');hold on;
+plot(time/orb_period, vdqs(3,:),'b--');hold on;
+plot(time/orb_period, vdqs_true(1,:),'r');hold on;
+plot(time/orb_period, vdqs_true(2,:),'g');hold on;
+plot(time/orb_period, vdqs_true(3,:),'b');hold on;
 xlabel('Time (orbits)')
 ylabel('Quaternion 1-3')
 title('Attitude in partial (Sun) quaternion vector');
