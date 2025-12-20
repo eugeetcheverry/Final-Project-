@@ -15,20 +15,16 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 %---------------------------CONFIGURACIÓN----------------------------------
 
 ECLIPSE = 1;
-RMM = 1;
+RMM = 0;
 GRAV_GRAD = 1;
-SOLAR_TORQ = 1;
+SOLAR_TORQ = 0;
 DRAG = 0;
 J_DIAGONAL = 0;
-
 SUN_POINTING = 1;
-
-RMM_ESTIMATE = 1;
-RMM_COMPENSATE = 1;
-Q_ESTIMATE = 1;
-
+RMM_ESTIMATE = 0;
+RMM_COMPENSATE = 0;
+Q_ESTIMATE = 0;
 SAVE_FIG = 0;
-
 
 %-------------------------------ORBITA-------------------------------------
 
@@ -41,7 +37,7 @@ stat = kepel_statvec(kepel);
 delk = delkep(kepel);
 
 % Velocidad Orbital
-GM = 3.986004418e14;
+GM = 3.986004418e14; 
 orb_period = sqrt(4*pi^2*kepel(1)^3/GM);
 omeg_0 = 2*pi/orb_period;
 
@@ -60,7 +56,6 @@ w_ang = [10, 10, 10]'*pi/180;           % in radians/sec
 % Initial control torque:
 contq = [0 0 0]';
     
-
 %-----------------------------EFEMERIDES-----------------------------------
 
 % Ephemerides date in Modified Julian date:
@@ -78,7 +73,6 @@ tstart = 0;              % initial time (sec)
 tstep = 2;               % step time (sec)
 tend = 10*orb_period;    % end time (10 minutes)
 
-
 %-----------------------------DINAMICA-------------------------------------
 
 % Inertia matrix of axis-symetric rigid body:
@@ -87,7 +81,6 @@ if J_DIAGONAL
     iner = [0.0021 0 0; 0 0.0018 0; 0 0 0.002];
 end
          % in kg*m*m
-%iner = [27 0 0; 0 17 0; 0 0 25];       % in kg*m*m
 
 % Inverse inertia matrix:
 invin = inv(iner);
@@ -143,6 +136,11 @@ S_sat = 0.01; %m^2 superficie la cual le da el sol
 C_r = 1; %Coeficiente de relexion del satelite
 r_cp = [0.001 0 0];%Distancia del centro de masas al centro de presion
 
+%---------------------------DRAG ATMOSFERICO------------------------------
+
+C_d = 2.2; %Coeficiente de rozamiento
+p_atmos = 3.8e-12; %Densidad atmosferica
+
 %-----------------------VECTORES PARA GRAFICAR-----------------------------
 
 % Initial vectors
@@ -153,7 +151,7 @@ orbit = stat';          % Orbit elements (state vector)
 keorb = kepel';         % Orbit elements (keplerian)
 
 gamavg = 0*eye(3);      % Gamma avg inicial
-maxmagmom = 0.02;       % Tope momento magnético en Am2
+maxmagmom = 0.1;       % Tope momento magnético en Am2
 vdq = [0;0;0];
 vdqs = [0;0;0];
 vdw = [0;0;0];
@@ -172,7 +170,8 @@ vsingularM_5 = 0;
 vsingularM_10 = 0;
 vsingularM_50 = 0;
 vsun_torq = [0; 0; 0];
-
+vdrag_torq = [0; 0; 0];
+vgrav_grad = [0; 0; 0];
 %------------------------------SIMULACION----------------------------------
 
 for t = tstart:tstep:tend
@@ -312,6 +311,14 @@ for t = tstart:tstep:tend
         end
         ext_torq = ext_torq + sun_torq';
         
+        %-------------------------DRAG ATMOSFERICO-------------------------
+        drag_torq = [0 0 0];
+        if (DRAG == 1)
+            v_inercial = stat(4:end);
+            v_rela = quatrmx(quat)*v_inercial';
+            [F_drag, drag_torq] = atmosferic_drag(r_cp, v_rela, S_sat, C_d, p_atmos);
+        end
+        ext_torq = ext_torq + drag_torq';
         %-------------------------OBSERVABILIDAD---------------------------
 
         obs_1 = update(obs_1, phik);
@@ -366,7 +373,8 @@ for t = tstart:tstep:tend
     vsingularM_10 = [vsingularM_10; sing_O_10];
     vsingularM_50 = [vsingularM_50; sing_O_50];
     vsun_torq = [vsun_torq sun_torq'];
-
+    vdrag_torq = [vdrag_torq drag_torq'];
+    vgrav_grad = [vgrav_grad grad_grav];
 end
 
 close all
@@ -497,4 +505,28 @@ xlabel('Time (orbits)')
 grid on;
 if SAVE_FIG == 1
     print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
+end
+figure(28);clf;
+plot(time/orb_period, vdrag_torq(1,:),'r');hold on;
+plot(time/orb_period, vdrag_torq(2,:),'g');hold on;
+plot(time/orb_period, vdrag_torq(3,:),'b');hold on;
+%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+title('Drag torque [Nm]')
+xlabel('Time (orbits)')
+grid on;
+if SAVE_FIG == 1
+    print(gcf, ['drag_torq' timestamp '.png'], '-dpng')
+end
+figure(29);clf;
+plot(time/orb_period, vgrav_grad(1,:),'r');hold on;
+plot(time/orb_period, vgrav_grad(2,:),'g');hold on;
+plot(time/orb_period, vgrav_grad(3,:),'b');hold on;
+%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+title('Gravity Gradient [Nm]')
+xlabel('Time (orbits)')
+grid on;
+if SAVE_FIG == 1
+    print(gcf, ['drag_torq' timestamp '.png'], '-dpng')
 end
