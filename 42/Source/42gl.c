@@ -1556,8 +1556,8 @@ void DrawNearAuxObjects(void)
                      RotateR2L(B->CN);
                      DrawVector(S->svb,"s"," ",SvbColor,AxisLength,
                         1.0,TRUE);
-                     if (MAGV(AC->bvb) > 0.0)
-                        DrawVector(AC->bvb,"B","uT",BvbColor,AxisLength,
+                     if (MAGV(S->bvb) > 0.0)     // AC changed to S, dec 2025
+                        DrawVector(S->bvb,"B","uT",BvbColor,AxisLength, // AC changed to S, dec 2025
                            1.0E6,FALSE);
                      if (MAGV(S->Hvb) > 0.0)
                         DrawVector(S->Hvb,"H","Nms",HvbColor,AxisLength,
@@ -3956,7 +3956,7 @@ void DrawUnitSphere(void)
 
       /* Magnetic Field */
       if (W->Spot[0].Selected) {
-         MxV(CVB0,AC->bvb,VecV);
+         MxV(CVB0,S->bvb,VecV); // AC  changed to S, dec 2025
          VecToLngLat(VecV,&lng,&lat);
          glColor4fv(MagFieldColor);
          DrawMercatorVector(lng,lat,"Mag");

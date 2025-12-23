@@ -30,7 +30,7 @@ NONE                          ! Shaker File Name
 123.0                         ! Mass
 12.4  24.7  24.3              ! Moments of Inertia (kg-m^2)
 0.0  0.05  0.0                ! Products of Inertia (xy,xz,yz)
--0.000014 0.0  -0.0005        ! Location of mass center, m
+-0.000014 0.0 -0.0005         ! Location of mass center, m
 0.0  0.0  0.0                 ! Constant Embedded Momentum (Nms)
 0.005  0.005 -0.005           ! Constant Embedded Magnetic Dipole (A-m^2) 0.1 limit
 usat1.obj                     ! Geometry Input File Name
@@ -269,7 +269,7 @@ Z_AXIS                        ! Boresight Axis X_AXIS, Y_AXIS, or Z_AXIS
 2                             ! Number of Star Trackers
 =============================== ST 0 ====================================
 0.5                           ! Sample Time,sec
--25.0   45.0   0.0  123       ! Mounting Angles (deg), Seq in Body
++25.0   45.0   0.0  123       ! Mounting Angles (deg), Seq in Body
 Z_AXIS                        ! Boresight Axis X_AXIS, Y_AXIS, or Z_AXIS
 10.0   12.0                   ! X, Y FOV Size, deg
 22.0  15.0  10.0              ! Sun, Earth, Moon Exclusion Angles, deg
@@ -277,7 +277,7 @@ Z_AXIS                        ! Boresight Axis X_AXIS, Y_AXIS, or Z_AXIS
 0                             ! Node
 =============================== ST 1 ====================================
 0.5                           ! Sample Time,sec
--25.0  -45.0    0.0  123      ! Mounting Angles (deg), Seq in Body
++25.0  -45.0    0.0  123      ! Mounting Angles (deg), Seq in Body
 Z_AXIS                        ! Boresight Axis X_AXIS, Y_AXIS, or Z_AXIS
 10.0   12.0                   ! X, Y FOV Size, deg
 22.0  15.0  10.0              ! Sun, Earth, Moon Exclusion Angles, deg

@@ -32,7 +32,7 @@ NONE                          ! Shaker File Name
 0.0  0.0  0.0                 ! Products of Inertia (xy,xz,yz)
 0.0  0.0  0.01                ! Location of mass center, m
 0.0  0.0  0.0                 ! Constant Embedded Momentum (Nms)
-0.001  0.001  0.0             ! Constant Embedded Magnetic Dipole (A-m^2)
+0.001  0.001  0.0005          ! Constant Embedded Magnetic Dipole (A-m^2)
 usat1.obj                     ! Geometry Input File Name
 NONE                          ! Node File Name
 NONE                          ! Flex File Name
@@ -101,7 +101,7 @@ PULSED                        ! Mode (PULSED or PROPORTIONAL)
 0.07                          ! Angle Random Walk (deg/rt-hr)
 0.1  1.0                      ! Bias Stability (deg/hr) over timespan (hr)
 0.1                           ! Angle Noise, arcsec RMS
-0.1                           ! Initial Bias (deg/hr)
+220.1                         ! Initial Bias (deg/hr)
 0                             ! Node
 ============================== Axis 1 ===================================
 1.0                           ! Sample Time,sec
@@ -112,7 +112,7 @@ PULSED                        ! Mode (PULSED or PROPORTIONAL)
 0.07                          ! Angle Random Walk (deg/rt-hr)
 0.1  1.0                      ! Bias Stability (deg/hr) over timespan (hr)
 0.1                           ! Angle Noise, arcsec RMS
-0.1                           ! Initial Bias (deg/hr)
+220.1                         ! Initial Bias (deg/hr)
 0                             ! Node
 ============================== Axis 2 ===================================
 1.0                           ! Sample Time,sec
@@ -123,7 +123,7 @@ PULSED                        ! Mode (PULSED or PROPORTIONAL)
 0.07                          ! Angle Random Walk (deg/rt-hr)
 0.1  1.0                      ! Bias Stability (deg/hr) over timespan (hr)
 0.1                           ! Angle Noise, arcsec RMS
-0.1                           ! Initial Bias (deg/hr)
+220.1                         ! Initial Bias (deg/hr)
 0                             ! Node
 *************************** Magnetometer ********************************
 3                             ! Number of Magnetometer Axes

@@ -1,13 +1,13 @@
 <<<<<<<<<<<<<<<<<  42: Spacecraft Description File   >>>>>>>>>>>>>>>>>
 Simple generic S/C            !  Description
-"S/C 0"                         !  Label
+"S/C 0"                       !  Label
 GenScSpriteAlpha.ppm          !  Sprite File Name
 CFS_FSW                       !  Flight Software Identifier
 0.2                           !  FSW Sample Time, sec
 ************************* Orbit Parameters ****************************
 FIXED                         !  Orbit Prop FIXED, EULER_HILL, ENCKE, or COWELL
 CM                            !  Pos of CM or ORIGIN, wrt F
-20.0  0.0  0.0                 !  Pos wrt Formation (m), expressed in F
+20.0  0.0  0.0                !  Pos wrt Formation (m), expressed in F
 0.0  0.0  0.0                 !  Vel wrt Formation (m/s), expressed in F
 *************************** Initial Attitude ***************************
 LAL                           ! Ang Vel wrt [NL], Att [QA] wrt [NLF]
@@ -20,7 +20,7 @@ FALSE                         ! Compute Constraint Forces and Torques
 REFPT_CM                      ! Mass Props referenced to REFPT_CM or REFPT_JOINT
 FALSE                         ! Flex Active
 FALSE                         ! Include 2nd Order Flex Terms
-NONE                        ! Shaker File Name
+NONE                          ! Shaker File Name
 2.0                           ! Drag Coefficient
 ************************************************************************
 ************************* Body Parameters ******************************
@@ -125,7 +125,7 @@ PULSED                        ! Mode (PULSED or PROPORTIONAL)
 0                             ! Body
 0                             ! Node
 ******************************* Gyro ************************************
-3                                ! Number of Gyro Axes
+3                             ! Number of Gyro Axes
 ============================== Axis 0 ===================================
 0.1                           ! Sample Time,sec
 1.0  0.0  0.0                 ! Axis expressed in Body Frame

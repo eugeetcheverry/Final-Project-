@@ -7,7 +7,7 @@ CFS_FSW                       !  Flight Software Identifier
 ************************* Orbit Parameters ****************************
 FIXED                         !  Orbit Prop FIXED, EULER_HILL, ENCKE, or COWELL
 CM                            !  Pos of CM or ORIGIN, wrt F
--20.0  0.0  0.0                 !  Pos wrt Formation (m), expressed in F
+-20.0  0.0  0.0               !  Pos wrt Formation (m), expressed in F
 0.0  0.0  0.0                 !  Vel wrt Formation (m/s), expressed in F
 *************************** Initial Attitude ***************************
 LAL                           ! Ang Vel wrt [NL], Att [QA] wrt [NLF]
@@ -20,7 +20,7 @@ FALSE                         ! Compute Constraint Forces and Torques
 REFPT_CM                      ! Mass Props referenced to REFPT_CM or REFPT_JOINT
 FALSE                         ! Flex Active
 FALSE                         ! Include 2nd Order Flex Terms
-NONE                        ! Shaker File Name
+NONE                          ! Shaker File Name
 2.0                           ! Drag Coefficient
 ************************************************************************
 ************************* Body Parameters ******************************
@@ -67,8 +67,8 @@ FALSE  FALSE  FALSE           ! TrnDOF Locked
 0.0  -2.5  0.0                ! Position wrt outer body origin, m
 NONE                          ! Parameter File Name
 *************************** Wheel Parameters ***************************
-FALSE                       ! Wheel Drag Active
-FALSE                       ! Wheel Jitter Active
+FALSE                         ! Wheel Drag Active
+FALSE                         ! Wheel Jitter Active
 4                             ! Number of wheels
 =============================  Wheel 0  ================================
 0.0                           ! Initial Momentum, N-m-sec
@@ -125,7 +125,7 @@ PULSED                        ! Mode (PULSED or PROPORTIONAL)
 0                             ! Body
 0                             ! Node
 ******************************* Gyro ************************************
-3                                ! Number of Gyro Axes
+3                             ! Number of Gyro Axes
 ============================== Axis 0 ===================================
 0.1                           ! Sample Time,sec
 1.0  0.0  0.0                 ! Axis expressed in Body Frame

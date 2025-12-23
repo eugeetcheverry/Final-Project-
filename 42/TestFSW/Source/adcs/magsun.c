@@ -1296,6 +1296,7 @@ int adcsRwTriadTLEf(struct AcType *AC)
    for (int ii=0; ii<4; ii++) for (int jj=0; jj<7; jj++) Blamt[ii][jj]=Blam[jj][ii];
    pinv47(Blamt,pBlamt);
    for (int ii=0; ii<4; ii++) for (int jj=0; jj<7; jj++) pBlam[ii][jj]=pBlamt[jj][ii];
+   // 1,2,3 -> 2,0,1 es la traducción de ejes RTN a los ejes del FOCUS
    AC->IdealFrc[2]=-ko*(pBlam[1][1]*dalfaf[1]+pBlam[1][2]*dalfaf[2]+pBlam[1][3]*dalfaf[3]+pBlam[1][4]*dalfaf[4]+pBlam[1][5]*dalfaf[5]+pBlam[1][6]*dalfaf[6]);
    AC->IdealFrc[0]=-ko*(pBlam[2][1]*dalfaf[1]+pBlam[2][2]*dalfaf[2]+pBlam[2][3]*dalfaf[3]+pBlam[2][4]*dalfaf[4]+pBlam[2][5]*dalfaf[5]+pBlam[2][6]*dalfaf[6]);
    AC->IdealFrc[1]=-ko*(pBlam[3][1]*dalfaf[1]+pBlam[3][2]*dalfaf[2]+pBlam[3][3]*dalfaf[3]+pBlam[3][4]*dalfaf[4]+pBlam[3][5]*dalfaf[5]+pBlam[3][6]*dalfaf[6]);
@@ -1368,7 +1369,7 @@ int adcsRwStkGPSf(struct AcType *AC)
 /* ********************************************************************
 
 /* ********************************************************************
-   ADCS based on TAM, CSS, Gyros, MTQ and a Wheel pyramid
+   ADCS based on TAM, CSS, Gyros, MTQ and a three Wheels
    Detumbling: 
       TAM, Gyros and MTQ
    Sun Pointing: 
@@ -1397,6 +1398,12 @@ int adcsRwStkGPSf(struct AcType *AC)
      double threclipse = 0.5;            // Eclipse detection threshold (between 0 and 6, 6 never detects daylight, 0 never detects eclipse)
      double J[3] = {AC->MOI[0][0], AC->MOI[1][1], AC->MOI[2][2]};   // Inertia Matrix Diagonal
      double nw = sqrt(AC->wbn[0]*AC->wbn[0]+AC->wbn[1]*AC->wbn[1]+AC->wbn[2]*AC->wbn[2]);   // Norm of angular velocity in b
+
+     static double T0 = 0.;
+     
+     if (T0==0.) T0 = AC->Time;
+
+     printf("\n t = %f   AC->qrn[0] = %f   AC->qrn[1] = %f ", AC->Time-T0, AC->qrn[0], AC->qrn[1]);
   
      if (mbvb > 0.) {
         double m[3], u[3];
@@ -1506,12 +1513,12 @@ int adcsRwStkGPSf(struct AcType *AC)
               AC->Tcmd[1] -= cor[1];
               AC->Tcmd[2] -= cor[2];
            }
-           if (mm[0]> AC->MTB[0].Mmax) mm[0] = AC->MTB[0].Mmax; 
-           if (mm[0]<-AC->MTB[0].Mmax) mm[0] = -AC->MTB[0].Mmax; 
-           if (mm[1]> AC->MTB[1].Mmax) mm[1] = AC->MTB[1].Mmax; 
-           if (mm[1]<-AC->MTB[1].Mmax) mm[1] = -AC->MTB[1].Mmax; 
-           if (mm[2]> AC->MTB[2].Mmax) mm[2] = AC->MTB[2].Mmax; 
-           if (mm[2]<-AC->MTB[2].Mmax) mm[2] = -AC->MTB[2].Mmax; 
+           if (mm[0]> AC->MTB[0].Mmax) mm[0] = AC->MTB[0].Mmax;
+           if (mm[0]<-AC->MTB[0].Mmax) mm[0] = -AC->MTB[0].Mmax;
+           if (mm[1]> AC->MTB[1].Mmax) mm[1] = AC->MTB[1].Mmax;
+           if (mm[1]<-AC->MTB[1].Mmax) mm[1] = -AC->MTB[1].Mmax;
+           if (mm[2]> AC->MTB[2].Mmax) mm[2] = AC->MTB[2].Mmax;
+           if (mm[2]<-AC->MTB[2].Mmax) mm[2] = -AC->MTB[2].Mmax;
         }
         
         for (int i = 0; i < 3; i++) {
@@ -1521,7 +1528,7 @@ int adcsRwStkGPSf(struct AcType *AC)
            retval = 1;
            printf("\n RETVAL=1 ss = %d, sp = %d ", secondssun, secondspointed);
         }
-        
+    
         // Adaptation of drag model
         
         static double chatx=0., chaty=0., chatz=0.;
@@ -1603,7 +1610,7 @@ int adcsRwStkGPSf(struct AcType *AC)
      }
   
   /* .. Commanded Attitude */
-     double orbit2sar=-20.*3.1416/180.;
+     double orbit2sar = 0.*3.1416/180.;
      double sarend=orbit2sar;
   
      static double sarendf=0.*3.1416/180.;

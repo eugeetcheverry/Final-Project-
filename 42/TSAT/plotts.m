@@ -78,7 +78,7 @@ plot(orbit,QBN(:,1),'r');hold on;grid on;title('QBN');
 plot(orbit,QBN(:,2),'g');hold on;grid on;title('QBN');
 plot(orbit,QBN(:,3),'b');hold on;grid on;title('QBN');
 plot(orbit,QBN(:,4),'k');hold on;grid on;title('QBN');xlabel('Orbits');
-axis([0 10 -1 1]);
+%axis([0 10 -1 1]);
 %axis([0 10 -0.002 0.001]);
 %legend('No Unloading','Unloading','Location','WestSouth')
 

@@ -1,4 +1,4 @@
-<<<<<<<<<<<<<<<<<  42: Spacecraft Description File   >>>>>>>>>>>>>>>>>
+    <<<<<<<<<<<<<<<<<  42: Spacecraft Description File   >>>>>>>>>>>>>>>>>
 Small Cubesat                 !  Description
 "TSAT"                        !  Label
 GenScSpriteAlpha.ppm          !  Sprite File Name
@@ -87,15 +87,15 @@ NONE                          ! Jitter Input File Name
 **************************** MTB Parameters ****************************
 3                             ! Number of MTBs
 ==============================  MTB 0  =================================
-0.24                          ! Saturation (A-m^2)
+0.19                          ! Saturation (A-m^2)
 1.0   0.0   0.0               ! MTB Axis Components, [X, Y, Z]
 0                             ! Flex Node Index
 ==============================  MTB 1  =================================
-0.24                          ! Saturation (A-m^2)
+0.19                          ! Saturation (A-m^2)
 0.0   1.0   0.0               ! MTB Axis Components, [X, Y, Z]
 0                             ! Flex Node Index
 ==============================  MTB 2  =================================
-0.24                          ! Saturation (A-m^2)
+0.19                          ! Saturation (A-m^2)
 0.0   0.0   1.0               ! MTB Axis Components, [X, Y, Z]
 0                             ! Flex Node Index
 ************************* Thruster Parameters **************************
@@ -231,11 +231,11 @@ Z_AXIS                        ! Boresight Axis X_AXIS, Y_AXIS, or Z_AXIS
 1                             ! Number of Star Trackers
 =============================== ST 0 ====================================
 0.5                           ! Sample Time,sec
-0.0   0.0   0.0  123          ! Mounting Angles (deg), Seq in Body
+37.5 0.0  0.0  123            ! Mounting Angles (deg), Seq in Body
 Z_AXIS                        ! Boresight Axis X_AXIS, Y_AXIS, or Z_AXIS
-10.0   12.0                   ! X, Y FOV Size, deg
-22.0  15.0  10.0              ! Sun, Earth, Moon Exclusion Angles, deg
-72.0  72.0  216.0             ! Noise Equivalent Angle, arcsec RMS
+8.0  8.0                      ! X, Y FOV Size, deg
+60.0  60.0  0.0               ! Sun, Earth, Moon Exclusion Angles, deg
+5.0  5.0  20.0             ! Noise Equivalent Angle, arcsec RMS
 0                             ! Node
 ****************************** GPS **************************************
 1                             ! Number of GPS Receivers

@@ -6,12 +6,12 @@ ILLUM = dlmread('Illum.42');
 ALBEDO = dlmread('Albedo.42');
 SVB = dlmread('svb.42');
 
-VELN = dlmread('VelN.42');
+VELN = dlmread('VelN.42');  % N: Inertial, B: Body L: Local R: Reference
 POSN = dlmread('PosN.42');
 
 orbit=(1:length(POSN))/(96.77*60);
 
-if 1==1
+if 1==0
 vmean_elem=[];
 voscul_elem=[];
 figure(2);clf;
@@ -195,7 +195,7 @@ plot(orbit(r1),asin(vm(r1     ,1))*180/pi*2,'k');hold on;grid on;
 %plot((vm(r1+7500,1)),'k');hold on;grid on;
 %plot((vm(r1+10000,1)),'k');hold on;grid on;
 %plot((vm(r1+12500,1)),'k');hold on;grid on;
-xlabel('[Seconds]');hold on;
+xlabel('[Orbits]');hold on;
 ylabel('[Degrees]');hold on;
 title('T Pointing Error [deg]');
 subplot(1,3,2);
@@ -221,6 +221,52 @@ plot(orbit(r1),asin(vm(r1     ,3))*180/pi*2,'k');hold on;grid on;
 xlabel('[Orbits]');hold on;
 ylabel('[Degrees]');hold on;
 title('R Pointing Error [deg]');
+
+  
+figure(31);clf;
+%plot(orbit(length(POSN)-length(vm)+1:length(POSN)),asin(vm(:,1))*180/pi*2,'r');hold on;grid on;
+%plot(orbit(length(POSN)-length(vm)+1:length(POSN)),asin(vm(:,2))*180/pi*2,'g');hold on;grid on;
+%plot(orbit(length(POSN)-length(vm)+1:length(POSN)),asin(vm(:,3))*180/pi*2,'b');hold on;grid on;
+r1=1:length(vm);
+r1=24500:25000;
+subplot(1,3,1);
+plot(asin(vm(r1     ,1))*180/pi*2,'k');hold on;grid on;
+%plot((vm(r1+2500,1)),'k');hold on;grid on;
+%plot((vm(r1+2500,1)),'k');hold on;grid on;
+%plot((vm(r1+5000,1)),'k');hold on;grid on;
+%plot((vm(r1+7500,1)),'k');hold on;grid on;
+%plot((vm(r1+10000,1)),'k');hold on;grid on;
+%plot((vm(r1+12500,1)),'k');hold on;grid on;
+xlabel('[Samples]');hold on;
+ylabel('[Degrees]');hold on;
+title('T Pointing Error [deg]');
+subplot(1,3,2);
+plot(asin(vm(r1     ,2))*180/pi*2,'k');hold on;grid on;
+%plot((vm(r1+2500,2)),'k');hold on;grid on;
+%plot((vm(r1+2500,2)),'k');hold on;grid on;
+%plot((vm(r1+5000,2)),'k');hold on;grid on;
+%plot((vm(r1+7500,2)),'k');hold on;grid on;
+%plot((vm(r1+10000,2)),'k');hold on;grid on;
+%plot((vm(r1+12500,2)),'k');hold on;grid on;
+xlabel('[Samples]');hold on;
+ylabel('[Degrees]');hold on;
+title('N Pointing Error [deg]');
+subplot(1,3,3);
+plot(asin(vm(r1     ,3))*180/pi*2,'k');hold on;grid on;
+%plot((vm(r1+2500,3)),'k');hold on;grid on;
+%plot((vm(r1+2500,3)),'k');hold on;grid on;
+%plot((vm(r1+5000,3)),'k');hold on;grid on;
+%plot((vm(r1+7500,3)),'k');hold on;grid on;
+%plot((vm(r1+10000,3)),'k');hold on;grid on;
+%plot((vm(r1+12500,3)),'k');hold on;grid on;
+%plot(orbit(length(POSN)-length(vm)+1:length(POSN)),asin(vm(:,4))*180/pi*2,'k');hold on;grid on;
+xlabel('[Samples]');hold on;
+ylabel('[Degrees]');hold on;
+title('R Pointing Error [deg]');
+
+rmsR = sqrt(sum( (asin(vm(r1,3))*180/pi*2).^2)/length(r1) )*3
+rmsN = sqrt(sum( (asin(vm(r1,2))*180/pi*2).^2)/length(r1) )*3
+rmsT = sqrt(sum( (asin(vm(r1,1))*180/pi*2).^2)/length(r1) )*3
 
 end;
 

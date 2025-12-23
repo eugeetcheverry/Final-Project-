@@ -13,7 +13,7 @@ TRUE                          !  Secular Orbit Drift Due to J2
 KEP                           !  Use Keplerian elements (KEP) or (RV) or FILE
 AE                            !  Per/Ap(PA), Alt/Ecc(AE)
 519.0  533.0                  !  Peri & Apo Alt, km
-527.0  -0.00055               !  Min Altitude (km), Ecc 0.001258
+527.0  0.001258               !  Min Altitude (km), Ecc 0.001258
 97.5                          !  Inclination (deg)
 0.0                           !  RAAN (deg)
 90.0                          !  Arg of Periapsis (deg)
