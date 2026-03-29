@@ -19,20 +19,21 @@ RMM = 1;
 GRAV_GRAD = 1;
 SOLAR_TORQ = 1;
 DRAG = 0;
+GRAPH_PERTURBATIONS = 1;
+
 J_DIAGONAL = 0;
 
 SUN_POINTING = 1;
+NADIR_POINTING = 0;
 
 RMM_ESTIMATE = 1;
 RMM_COMPENSATE = 1;
 Q_ESTIMATE = 1;
-
-SAVE_FIG = 0;
-
+GRAPH_ESTIMATES = 1;
 
 %-------------------------------ORBITA-------------------------------------
-
-kepel = [7000000, 0.01, 95*pi/180, 0, 0, 0];
+RE = 6378000;
+kepel = [RE + 700000, 0.01, 98*pi/180, 0, 0, 0];
 
 % Orbit state vector:
 stat = kepel_statvec(kepel);
@@ -55,11 +56,12 @@ quat = ezxzquat(eulzxz);        % converted from Euler angles
 quat = quat/norm(quat);
 
 % Angular velocity vector in body frame:
-w_ang = [10, 10, 10]'*pi/180;           % in radians/sec
+w_ang = [1, 1, 1]'*pi/180;           % in radians/sec
 
 % Initial control torque:
 contq = [0 0 0]';
-    
+angles = 0;
+angles_ = 0;
 
 %-----------------------------EFEMERIDES-----------------------------------
 
@@ -152,8 +154,10 @@ omeg = w_ang;           % Angular velocity
 orbit = stat';          % Orbit elements (state vector)
 keorb = kepel';         % Orbit elements (keplerian)
 
+gamma = 0*eye(3);
+gamma_acum = 0*eye(3);
 gamavg = 0*eye(3);      % Gamma avg inicial
-maxmagmom = 0.02;       % Tope momento magnético en Am2
+maxmagmom = 0.1;       % Tope momento magnético en Am2
 vdq = [0;0;0];
 vdqs = [0;0;0];
 vdw = [0;0;0];
@@ -172,7 +176,10 @@ vsingularM_5 = 0;
 vsingularM_10 = 0;
 vsingularM_50 = 0;
 vsun_torq = [0; 0; 0];
-
+vrmm_torq = [0; 0; 0];
+vgrad_grav = [0; 0; 0];
+vdqs_true = [0; 0; 0];
+vgamma_avas = [0; 0; 0];
 %------------------------------SIMULACION----------------------------------
 
 for t = tstart:tstep:tend
@@ -191,12 +198,12 @@ for t = tstart:tstep:tend
         grad_grav = 3*omeg_0^2*cross(exb,iner*exb);
     end
     
-    mom_res = 0;
+    mom_res = [0; 0; 0];
     if RMM == 1
         mom_res = maxmagmom*[0.005; 0.005; -0.005];
     end
     
-    % Peor caso
+    %Peor caso
     %ambt = 2e-10*[1 1 1]';
     ambt = 0;
     
@@ -231,6 +238,12 @@ for t = tstart:tstep:tend
         earth_field_eci = terrestrial_to_inertial(gst(mjd, dfra+t), [earth_field_ecef 0 0 0])';
         earth_field_eci = earth_field_eci(1:3);
         earth_field_b = quatrmx(quat)*earth_field_eci;
+
+        %--------------------------GAMMA-----------------------------------
+
+        gamavg = gamavg*(t/(t+tstep)) + Skew(earth_field_b)*Skew(-earth_field_b)/(t+tstep)/norm(earth_field_b)/norm(earth_field_b);
+
+        gamma_avas = eig(gamavg);
         
         %--------------------------ECLIPSE---------------------------------
 
@@ -243,39 +256,85 @@ for t = tstart:tstep:tend
             end
         end
 
+        %-------------------------HORIZONTE--------------------------------
+
+        no_horizon = 0;
+        if angles_ > pi/4 || angles_ < -pi/4
+            no_horizon = 1;
+        end
+
         %---------------------CONTROL MAGNETICO----------------------------
         
-        
-        k_p = 0.00025;% ganancia proporcional
-        k_v = 0.3; % ganancia derivativa
-        eps = 0.01;% epsilon
 
         dq = quat(1:3);
         dw = w_ang;
         
-        dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
-        %dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;1])
+        % Error en base al modo
+        if SUN_POINTING  %Se configura que apunte solo al sol, dqs se actualiza siempre
+            dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
+        end
+        if NADIR_POINTING && no_horizon==0 %Se configura apuntamiento solo a nadir, se actualiza solo si se ve el horizonte
+            dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
+        end
+        if SUN_POINTING==0 && NADIR_POINTING==0 %No hay apuntamiento, solo detumbling
+            dqs = [0; 0; 0];
+        end
         angles = asin(norm(dqs));
         versors = dqs/norm(dqs);
         dqs = sin(angles/2)*versors;
         dqs4 = cos(angles/2); 
-        
-        if (norm(dw)<0.001 && dqs4*dqs4>0.1 && signq4==0) 
+
+
+        if SUN_POINTING % Se calculan los errores verdaderos
+            dqs_true = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
+        end
+        if NADIR_POINTING
+            dqs_true = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
+        end
+        if SUN_POINTING==0 && NADIR_POINTING==0
+            dqs_true = [0; 0; 0];
+        end
+        angles_ = asin(norm(dqs_true));
+        versors_ = dqs_true/norm(dqs_true);
+        dqs_true = sin(angles_/2)*versors_; 
+       
+
+        % Marcar fin del detumbling
+        if (norm(dw)<0.0005 && dqs4*dqs4>0.1 && signq4==0) 
            signq4=sign(dqs4);
         end
-        
-        % Control Derivativo
-        %u = - eps*k_v*iner*dw;
+
+        % Acualizar ganancias según el modo
+        if SUN_POINTING && signq4*signq4>0
+            k_p = 0.000025;% ganancia proporcional
+            k_v = 0.3; % ganancia derivativa
+            if eclipse 
+                eps = 0.03;% epsilon
+            else
+                eps = 0.01;% epsilon
+            end
+        end 
+        if NADIR_POINTING && signq4*signq4>0
+            if no_horizon
+                k_p = 0.0000025;% ganancia proporcional
+                k_v = 0.4; % ganancia derivativa
+                eps = 0.01;%epsilon
+            else
+                k_p = 0.000025;% ganancia proporcional
+                k_v = 0.3; % ganancia derivativa
+                eps = 0.02;%epsilon
+            end
+        end
+        controller = update(controller, k_v, k_p, eps);
+
+        % Determinar apuntamiento
         pointing = 0;
-        % Sun pointing: término proporcional
-        if (eclipse == 0 && signq4*signq4>0 && SUN_POINTING)
+        if (((eclipse == 0 && SUN_POINTING) || (NADIR_POINTING)) && signq4*signq4>0)
             pointing = 1;
-            %u = u - eps*eps*k_p*inv(iner)*dqs*signq4;
-            %u = u - eps*eps*k_p*dqs*signq4;
         end
         
+        % Generar acción de control
         u = get_control_action(controller, dqs, signq4, dw, pointing);
-        
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
         phik = 0;
@@ -287,6 +346,7 @@ for t = tstart:tstep:tend
             avas_sigma = eig(sigma);
             rmm_avas = avas_sigma(4:6);
         end
+
         %---------------------MOMENTO MAGNÉTICO----------------------------
         
         normb2 = norm(earth_field)^2;
@@ -335,6 +395,7 @@ for t = tstart:tstep:tend
         
         [T, Y] = ode45('rigbody', tspan, att_vec, options, ext_torq, iner, invin, ...
             mag_mom, earth_field);
+
     end
     
     t
@@ -353,12 +414,14 @@ for t = tstart:tstep:tend
     keorb = cat(2, keorb, kep2');
     vdq = [vdq dq];
     vdqs = [vdqs dqs];
+    vdqs_true = [vdqs_true dqs_true];
     vdw = [vdw dw]; 
     vmag_mom = [vmag_mom mag_mom];
     vext_torq = [vext_torq ext_torq];
     vrmm_hat = [vrmm_hat x_pred(4:6)];
     vdw_hat = [vdw_hat x_pred(1:3)];
     vrmm_diag_cov = [vrmm_diag_cov rmm_avas];
+    vrmm_torq = [vrmm_torq cross(mom_res, earth_field_b)];
     vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
     vsingularM_1 = [vsingularM_1; sing_O_1];
     vsingularM_2 = [vsingularM_2; sing_O_2];
@@ -366,6 +429,8 @@ for t = tstart:tstep:tend
     vsingularM_10 = [vsingularM_10; sing_O_10];
     vsingularM_50 = [vsingularM_50; sing_O_50];
     vsun_torq = [vsun_torq sun_torq'];
+    vgamma_avas = [vgamma_avas gamma_avas];
+    vgamma_avas(:,1) = vgamma_avas(:,2);
 
 end
 
@@ -380,43 +445,35 @@ xlabel('Time (orbits)')
 ylabel('Quaternion 1-3')
 title('Attitude in quaternion vector');
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Quat' timestamp '.png'], '-dpng')
-end
-
-figure(10)
-plot(time/orb_period, vdqs(1,:),'r');hold on;
-plot(time/orb_period, vdqs(2,:),'g');hold on;
-plot(time/orb_period, vdqs(3,:),'b');hold on;
-xlabel('Time (orbits)')
-ylabel('Quaternion 1-3')
-title('Attitude in partial (Sun) quaternion vector');
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Quat_sun' timestamp '.png'], '-dpng')
-end
 
 figure(2)
+plot(time/orb_period, vdqs(1,:),'r--');hold on;
+plot(time/orb_period, vdqs(2,:),'g--');hold on;
+plot(time/orb_period, vdqs(3,:),'b--');hold on;
+plot(time/orb_period, vdqs_true(1,:),'r');hold on;
+plot(time/orb_period, vdqs_true(2,:),'g');hold on;
+plot(time/orb_period, vdqs_true(3,:),'b');hold on;
+xlabel('Time (orbits)')
+ylabel('Quaternion 1-3')
+title('Attitude in partial quaternion vector');
+grid on;
+
+figure(3)
 plot(time/orb_period, omeg(1,:),'r');hold on;
 plot(time/orb_period, omeg(2,:),'g');hold on;
 plot(time/orb_period, omeg(3,:),'b');hold on;
 plot(time/orb_period,sqrt(omeg(1,:).^2+omeg(2,:).^2+omeg(3,:).^2),'k');hold on;
-
 plot(time/orb_period,vdw_hat(1,:),'r--');hold on;
 plot(time/orb_period,vdw_hat(2,:),'g--');hold on;
 plot(time/orb_period,vdw_hat(3,:),'b--');hold on;
-
 xlabel('Time (orbits)')
 ylabel('Angular velocity (rad/s)')
 title('Attitude angular velocity')
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Velocidad_angular' timestamp '.png'], '-dpng')
-end
 hold on;
 
-
-figure(22);clf;
+%a
+figure(4);clf;
 plot(time/orb_period,vmag_mom(1,:),'r');hold on;
 plot(time/orb_period,vmag_mom(2,:),'g');hold on;
 plot(time/orb_period,vmag_mom(3,:),'b');hold on;
@@ -426,75 +483,76 @@ title('Magnetorquers Control Magnetic Moment')
 xlabel('Time (orbits)')
 ylabel('Magnetic Moment (Am^2)')
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Momento_mag' timestamp '.png'], '-dpng')
-end
 
-figure(23);clf;
-plot(time/orb_period,vrmm_hat(1,:),'r');hold on;
-plot(time/orb_period,vrmm_hat(2,:),'g');hold on;
-plot(time/orb_period,vrmm_hat(3,:),'b');hold on;
+figure(5);clf;
+plot(time/orb_period,vgamma_avas(1,:),'r');hold on;
+plot(time/orb_period,vgamma_avas(2,:),'g');hold on;
+plot(time/orb_period,vgamma_avas(3,:),'b');hold on;
 %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
 %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Estimated RMM')
-xlabel('Time (orbits)')
-ylabel('Magnetic Moment (Am^2)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['RMM_hat' timestamp '.png'], '-dpng')
-end
-
-
-figure(24);clf;
-plot(time/orb_period,vrmm_diag_cov(1,:),'r');hold on;
-plot(time/orb_period,vrmm_diag_cov(2,:),'g');hold on;
-plot(time/orb_period,vrmm_diag_cov(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Eigenvalues of Estimated RMM Covariance')
+title('Average gamma eigenvalues')
 xlabel('Time (orbits)')
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
-end
 
 
-figure(25);clf;
-plot(time/orb_period,vQ(1,:),'r');hold on;
-plot(time/orb_period,vQ(2,:),'g');hold on;
-plot(time/orb_period,vQ(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Estimated Q [Am2]')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
+if GRAPH_ESTIMATES
+    figure(23);clf;
+    plot(time/orb_period,vrmm_hat(1,:),'r');hold on;
+    plot(time/orb_period,vrmm_hat(2,:),'g');hold on;
+    plot(time/orb_period,vrmm_hat(3,:),'b');hold on;
+    title('Estimated RMM')
+    xlabel('Time (orbits)')
+    ylabel('Magnetic Moment (Am^2)')
+    grid on;
+    
+    figure(24);clf;
+    plot(time/orb_period,vrmm_diag_cov(1,:),'r');hold on;
+    plot(time/orb_period,vrmm_diag_cov(2,:),'g');hold on;
+    plot(time/orb_period,vrmm_diag_cov(3,:),'b');hold on;
+    title('Eigenvalues of Estimated RMM Covariance')
+    xlabel('Time (orbits)')
+    grid on;
+    
+    
+    figure(25);clf;
+    plot(time/orb_period,vQ(1,:),'r');hold on;
+    plot(time/orb_period,vQ(2,:),'g');hold on;
+    plot(time/orb_period,vQ(3,:),'b');hold on;
+    title('Estimated Q [Am2]')
+    xlabel('Time (orbits)')
+    grid on;
+
+    figure(26);clf;
+    plot(time/orb_period,vsingularM_1);hold on;
+    plot(time/orb_period,vsingularM_2);hold on;
+    plot(time/orb_period,vsingularM_5);hold on;
+    plot(time/orb_period,vsingularM_10);hold on;
+    plot(time/orb_period,vsingularM_50);hold on;
+    legend('$O_1$', '$O_2$', '$O_5$', '$O_{10}$', '$O_{50}$' ,'Interpreter', 'latex')
+    title('Minimum singular values of $O_{\tau}$', 'Interpreter', 'latex')
+    xlabel('Time (orbits)')
+    grid on;
 end
 
-figure(26);clf;
-plot(time/orb_period,vsingularM_1);hold on;
-plot(time/orb_period,vsingularM_2);hold on;
-plot(time/orb_period,vsingularM_5);hold on;
-plot(time/orb_period,vsingularM_10);hold on;
-plot(time/orb_period,vsingularM_50);hold on;
-legend('$O_1$', '$O_2$', '$O_5$', '$O_{10}$', '$O_{50}$' ,'Interpreter', 'latex')
-title('Minimum singular values of $O_{\tau}$', 'Interpreter', 'latex')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
+if GRAPH_PERTURBATIONS
+    figure(27);clf;
+    plot(time/orb_period,vsun_torq(1,:),'r');hold on;
+    plot(time/orb_period,vsun_torq(2,:),'g');hold on;
+    plot(time/orb_period,vsun_torq(3,:),'b');hold on;
+    %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    title('Sun torque [Nm]')
+    xlabel('Time (orbits)')
+    grid on;
+    
+    figure(28);clf;
+    plot(time/orb_period,vrmm_torq(1,:),'r');hold on;
+    plot(time/orb_period,vrmm_torq(2,:),'g');hold on;
+    plot(time/orb_period,vrmm_torq(3,:),'b');hold on;
+    %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    title('RMM torque [Nm]')
+    xlabel('Time (orbits)')
+    grid on;
 end
 
-figure(27);clf;
-plot(time/orb_period,vsun_torq(1,:),'r');hold on;
-plot(time/orb_period,vsun_torq(2,:),'g');hold on;
-plot(time/orb_period,vsun_torq(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Sun torque [Nm]')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
-end
