@@ -1,2 +1,0 @@
-********************  Regions for 42  *******************
-0                            !  Number of Regions
