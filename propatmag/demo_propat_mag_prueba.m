@@ -14,22 +14,22 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
 %---------------------------CONFIGURACIÓN----------------------------------
 
-ECLIPSE = 0;
-RMM = 0;
-GRAV_GRAD = 0;
-SOLAR_TORQ = 0;
+ECLIPSE = 1;
+RMM = 1;
+GRAV_GRAD = 1;
+SOLAR_TORQ = 1;
 DRAG = 0;
+GRAPH_PERTURBATIONS = 1;
+
 J_DIAGONAL = 0;
 
-SUN_POINTING = 0;
+SUN_POINTING = 1;
 NADIR_POINTING = 0;
 
-RMM_ESTIMATE = 0;
-RMM_COMPENSATE = 0;
-Q_ESTIMATE = 0;
-
-SAVE_FIG = 0;
-
+RMM_ESTIMATE = 1;
+RMM_COMPENSATE = 1;
+Q_ESTIMATE = 1;
+GRAPH_ESTIMATES = 1;
 
 %-------------------------------ORBITA-------------------------------------
 RE = 6378000;
@@ -177,6 +177,7 @@ vsingularM_10 = 0;
 vsingularM_50 = 0;
 vsun_torq = [0; 0; 0];
 vrmm_torq = [0; 0; 0];
+vgrad_grav = [0; 0; 0];
 vdqs_true = [0; 0; 0];
 vgamma_avas = [0; 0; 0];
 %------------------------------SIMULACION----------------------------------
@@ -269,30 +270,22 @@ for t = tstart:tstep:tend
         dw = w_ang;
         
         % Error en base al modo
-        if SUN_POINTING
+        if SUN_POINTING  %Se configura que apunte solo al sol, dqs se actualiza siempre
             dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
-            angles = asin(norm(dqs));
-            versors = dqs/norm(dqs);
-            dqs = sin(angles/2)*versors;
-            dqs4 = cos(angles/2); 
         end
-        if NADIR_POINTING && no_horizon==0
+        if NADIR_POINTING && no_horizon==0 %Se configura apuntamiento solo a nadir, se actualiza solo si se ve el horizonte
             dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
-            angles = asin(norm(dqs));
-            versors = dqs/norm(dqs);
-            dqs = sin(angles/2)*versors;
-            dqs4 = cos(angles/2); 
         end
-        if SUN_POINTING==0 && NADIR_POINTING==0
+        if SUN_POINTING==0 && NADIR_POINTING==0 %No hay apuntamiento, solo detumbling
             dqs = [0; 0; 0];
-            angles = asin(norm(dqs));
-            versors = dqs/norm(dqs);
-            dqs = sin(angles/2)*versors;
-            dqs4 = cos(angles/2); 
         end
+        angles = asin(norm(dqs));
+        versors = dqs/norm(dqs);
+        dqs = sin(angles/2)*versors;
+        dqs4 = cos(angles/2); 
 
 
-        if SUN_POINTING 
+        if SUN_POINTING % Se calculan los errores verdaderos
             dqs_true = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
         end
         if NADIR_POINTING
@@ -342,7 +335,6 @@ for t = tstart:tstep:tend
         
         % Generar acción de control
         u = get_control_action(controller, dqs, signq4, dw, pointing);
-        u = [0; 0; 0];
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
         phik = 0;
@@ -354,6 +346,7 @@ for t = tstart:tstep:tend
             avas_sigma = eig(sigma);
             rmm_avas = avas_sigma(4:6);
         end
+
         %---------------------MOMENTO MAGNÉTICO----------------------------
         
         normb2 = norm(earth_field)^2;
@@ -452,11 +445,8 @@ xlabel('Time (orbits)')
 ylabel('Quaternion 1-3')
 title('Attitude in quaternion vector');
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Quat' timestamp '.png'], '-dpng')
-end
 
-figure(10)
+figure(2)
 plot(time/orb_period, vdqs(1,:),'r--');hold on;
 plot(time/orb_period, vdqs(2,:),'g--');hold on;
 plot(time/orb_period, vdqs(3,:),'b--');hold on;
@@ -465,33 +455,25 @@ plot(time/orb_period, vdqs_true(2,:),'g');hold on;
 plot(time/orb_period, vdqs_true(3,:),'b');hold on;
 xlabel('Time (orbits)')
 ylabel('Quaternion 1-3')
-title('Attitude in partial (Nadir) quaternion vector');
+title('Attitude in partial quaternion vector');
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Quat_sun' timestamp '.png'], '-dpng')
-end
 
-figure(2)
+figure(3)
 plot(time/orb_period, omeg(1,:),'r');hold on;
 plot(time/orb_period, omeg(2,:),'g');hold on;
 plot(time/orb_period, omeg(3,:),'b');hold on;
 plot(time/orb_period,sqrt(omeg(1,:).^2+omeg(2,:).^2+omeg(3,:).^2),'k');hold on;
-
 plot(time/orb_period,vdw_hat(1,:),'r--');hold on;
 plot(time/orb_period,vdw_hat(2,:),'g--');hold on;
 plot(time/orb_period,vdw_hat(3,:),'b--');hold on;
-
 xlabel('Time (orbits)')
 ylabel('Angular velocity (rad/s)')
 title('Attitude angular velocity')
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Velocidad_angular' timestamp '.png'], '-dpng')
-end
 hold on;
 
 %a
-figure(22);clf;
+figure(4);clf;
 plot(time/orb_period,vmag_mom(1,:),'r');hold on;
 plot(time/orb_period,vmag_mom(2,:),'g');hold on;
 plot(time/orb_period,vmag_mom(3,:),'b');hold on;
@@ -501,93 +483,8 @@ title('Magnetorquers Control Magnetic Moment')
 xlabel('Time (orbits)')
 ylabel('Magnetic Moment (Am^2)')
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Momento_mag' timestamp '.png'], '-dpng')
-end
 
-figure(23);clf;
-plot(time/orb_period,vrmm_hat(1,:),'r');hold on;
-plot(time/orb_period,vrmm_hat(2,:),'g');hold on;
-plot(time/orb_period,vrmm_hat(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Estimated RMM')
-xlabel('Time (orbits)')
-ylabel('Magnetic Moment (Am^2)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['RMM_hat' timestamp '.png'], '-dpng')
-end
-
-
-figure(24);clf;
-plot(time/orb_period,vrmm_diag_cov(1,:),'r');hold on;
-plot(time/orb_period,vrmm_diag_cov(2,:),'g');hold on;
-plot(time/orb_period,vrmm_diag_cov(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Eigenvalues of Estimated RMM Covariance')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
-end
-
-
-figure(25);clf;
-plot(time/orb_period,vQ(1,:),'r');hold on;
-plot(time/orb_period,vQ(2,:),'g');hold on;
-plot(time/orb_period,vQ(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Estimated Q [Am2]')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
-end
-
-figure(26);clf;
-plot(time/orb_period,vsingularM_1);hold on;
-plot(time/orb_period,vsingularM_2);hold on;
-plot(time/orb_period,vsingularM_5);hold on;
-plot(time/orb_period,vsingularM_10);hold on;
-plot(time/orb_period,vsingularM_50);hold on;
-legend('$O_1$', '$O_2$', '$O_5$', '$O_{10}$', '$O_{50}$' ,'Interpreter', 'latex')
-title('Minimum singular values of $O_{\tau}$', 'Interpreter', 'latex')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
-end
-
-figure(27);clf;
-plot(time/orb_period,vsun_torq(1,:),'r');hold on;
-plot(time/orb_period,vsun_torq(2,:),'g');hold on;
-plot(time/orb_period,vsun_torq(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Sun torque [Nm]')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
-end
-
-figure(27);clf;
-plot(time/orb_period,vrmm_torq(1,:),'r');hold on;
-plot(time/orb_period,vrmm_torq(2,:),'g');hold on;
-plot(time/orb_period,vrmm_torq(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('RMM torque [Nm]')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
-end
-
-figure(28);clf;
+figure(5);clf;
 plot(time/orb_period,vgamma_avas(1,:),'r');hold on;
 plot(time/orb_period,vgamma_avas(2,:),'g');hold on;
 plot(time/orb_period,vgamma_avas(3,:),'b');hold on;
@@ -596,6 +493,66 @@ plot(time/orb_period,vgamma_avas(3,:),'b');hold on;
 title('Average gamma eigenvalues')
 xlabel('Time (orbits)')
 grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
+
+
+if GRAPH_ESTIMATES
+    figure(23);clf;
+    plot(time/orb_period,vrmm_hat(1,:),'r');hold on;
+    plot(time/orb_period,vrmm_hat(2,:),'g');hold on;
+    plot(time/orb_period,vrmm_hat(3,:),'b');hold on;
+    title('Estimated RMM')
+    xlabel('Time (orbits)')
+    ylabel('Magnetic Moment (Am^2)')
+    grid on;
+    
+    figure(24);clf;
+    plot(time/orb_period,vrmm_diag_cov(1,:),'r');hold on;
+    plot(time/orb_period,vrmm_diag_cov(2,:),'g');hold on;
+    plot(time/orb_period,vrmm_diag_cov(3,:),'b');hold on;
+    title('Eigenvalues of Estimated RMM Covariance')
+    xlabel('Time (orbits)')
+    grid on;
+    
+    
+    figure(25);clf;
+    plot(time/orb_period,vQ(1,:),'r');hold on;
+    plot(time/orb_period,vQ(2,:),'g');hold on;
+    plot(time/orb_period,vQ(3,:),'b');hold on;
+    title('Estimated Q [Am2]')
+    xlabel('Time (orbits)')
+    grid on;
+
+    figure(26);clf;
+    plot(time/orb_period,vsingularM_1);hold on;
+    plot(time/orb_period,vsingularM_2);hold on;
+    plot(time/orb_period,vsingularM_5);hold on;
+    plot(time/orb_period,vsingularM_10);hold on;
+    plot(time/orb_period,vsingularM_50);hold on;
+    legend('$O_1$', '$O_2$', '$O_5$', '$O_{10}$', '$O_{50}$' ,'Interpreter', 'latex')
+    title('Minimum singular values of $O_{\tau}$', 'Interpreter', 'latex')
+    xlabel('Time (orbits)')
+    grid on;
 end
+
+if GRAPH_PERTURBATIONS
+    figure(27);clf;
+    plot(time/orb_period,vsun_torq(1,:),'r');hold on;
+    plot(time/orb_period,vsun_torq(2,:),'g');hold on;
+    plot(time/orb_period,vsun_torq(3,:),'b');hold on;
+    %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    title('Sun torque [Nm]')
+    xlabel('Time (orbits)')
+    grid on;
+    
+    figure(28);clf;
+    plot(time/orb_period,vrmm_torq(1,:),'r');hold on;
+    plot(time/orb_period,vrmm_torq(2,:),'g');hold on;
+    plot(time/orb_period,vrmm_torq(3,:),'b');hold on;
+    %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    title('RMM torque [Nm]')
+    xlabel('Time (orbits)')
+    grid on;
+end
+
