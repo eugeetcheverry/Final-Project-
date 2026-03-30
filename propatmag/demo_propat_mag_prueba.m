@@ -16,23 +16,23 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 
 ECLIPSE = 1;
 RMM = 0;
-GRAV_GRAD = 1;
+GRAV_GRAD = 0;
 SOLAR_TORQ = 0;
-DRAG = 0;
+DRAG = 1;
 GRAPH_PERTURBATIONS = 1;
 
 J_DIAGONAL = 0;
 SUN_POINTING = 1;
 NADIR_POINTING = 0;
 
-RMM_ESTIMATE = 1;
-RMM_COMPENSATE = 1;
-Q_ESTIMATE = 1;
+RMM_ESTIMATE = 0;
+RMM_COMPENSATE = 0;
+Q_ESTIMATE = 0;
 GRAPH_ESTIMATES = 1;
 
 %-------------------------------ORBITA-------------------------------------
 RE = 6378000;
-kepel = [RE + 700000, 0.01, 98*pi/180, 0, 0, 0];
+kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 0];
 
 % Orbit state vector:
 stat = kepel_statvec(kepel);
@@ -76,7 +76,7 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 
 % Propagation time in seconds:
 tstart = 0;              % initial time (sec)
-tstep = 2;               % step time (sec)
+tstep = 3;               % step time (sec)
 tend = 10*orb_period;    % end time (10 minutes)
 
 %-----------------------------DINAMICA-------------------------------------
@@ -181,9 +181,9 @@ vsun_torq = [0; 0; 0];
 vdrag_torq = [0; 0; 0];
 vgrav_grad = [0; 0; 0];
 vrmm_torq = [0; 0; 0];
-vgrad_grav = [0; 0; 0];
 vdqs_true = [0; 0; 0];
 vgamma_avas = [0; 0; 0];
+veclipse = 0;
 %------------------------------SIMULACION----------------------------------
 
 for t = tstart:tstep:tend
@@ -195,7 +195,7 @@ for t = tstart:tstep:tend
     stat = kepel_statvec(kep2);
 
     %-------------------------PERTURBACIONES-------------------------------
-    grad_grav = 0;
+    grad_grav = [0; 0; 0];
     if GRAV_GRAD == 1
         A    = quatrmx(quat);
         exb  = A(:,1);
@@ -342,13 +342,12 @@ for t = tstart:tstep:tend
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
         phik = 0;
-        rmm_avas = [0;0;0];
+        rmm_cov_diag = [0;0;0];
         if RMM_ESTIMATE == 1
             %[x_pred, sigma, phikm1, Q] = ekf_rmm(x_pred, (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, Q_min, alpha, R, tstep);
             [ekf_rmm, phik] = update(ekf_rmm, mag_mom - mom_res, earth_field_b, dw);
             [x_pred, sigma, Q] = get_estimates(ekf_rmm);
-            avas_sigma = eig(sigma);
-            rmm_avas = avas_sigma(4:6);
+            rmm_cov_diag = [sigma(4,4); sigma(5,5); sigma(6,6)];
         end
 
         %---------------------MOMENTO MAGNÉTICO----------------------------
@@ -371,7 +370,7 @@ for t = tstart:tstep:tend
             s_eci = sun_dir(mjd, dfra + t); % sun vector en ECI
             v_sun_body = quatrmx(quat) * s_eci(:); %sun vector en body
             norm_sun = norm(v_sun_body);
-            r_presion = (v_sun_body/norm_sun)*0.001;
+            r_presion = (v_sun_body/norm_sun)*0.001; %No sería r_cp?
             [F_sun, sun_torq] = solar_pressure(v_sun_body, T_sun, S_sat, r_presion', C_r);
         end
         ext_torq = ext_torq + sun_torq';
@@ -432,7 +431,7 @@ for t = tstart:tstep:tend
     vext_torq = [vext_torq ext_torq];
     vrmm_hat = [vrmm_hat x_pred(4:6)];
     vdw_hat = [vdw_hat x_pred(1:3)];
-    vrmm_diag_cov = [vrmm_diag_cov rmm_avas];
+    vrmm_diag_cov = [vrmm_diag_cov rmm_cov_diag];
     vrmm_torq = [vrmm_torq cross(mom_res, earth_field_b)];
     vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
     vsingularM_1 = [vsingularM_1; sing_O_1];
@@ -445,6 +444,7 @@ for t = tstart:tstep:tend
     vgrav_grad = [vgrav_grad grad_grav];
     vgamma_avas = [vgamma_avas gamma_avas];
     vgamma_avas(:,1) = vgamma_avas(:,2);
+    veclipse = [veclipse; eclipse];
 
 end
 
@@ -467,6 +467,7 @@ plot(time/orb_period, vdqs(3,:),'b--');hold on;
 plot(time/orb_period, vdqs_true(1,:),'r');hold on;
 plot(time/orb_period, vdqs_true(2,:),'g');hold on;
 plot(time/orb_period, vdqs_true(3,:),'b');hold on;
+plot(time/orb_period, veclipse, 'Color', '#FF8800');hold on;
 xlabel('Time (orbits)')
 ylabel('Quaternion 1-3')
 title('Attitude in partial quaternion vector');
@@ -568,41 +569,27 @@ if GRAPH_PERTURBATIONS
     title('RMM torque [Nm]')
     xlabel('Time (orbits)')
     grid on;
+
+    figure(29);clf;
+    plot(time/orb_period, vdrag_torq(1,:),'r');hold on;
+    plot(time/orb_period, vdrag_torq(2,:),'g');hold on;
+    plot(time/orb_period, vdrag_torq(3,:),'b');hold on;
+    %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    title('Drag torque [Nm]')
+    xlabel('Time (orbits)')
+    grid on;
+
+    figure(30);clf;
+    plot(time/orb_period, vgrav_grad(1,:),'r');hold on;
+    plot(time/orb_period, vgrav_grad(2,:),'g');hold on;
+    plot(time/orb_period, vgrav_grad(3,:),'b');hold on;
+    %plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    %plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
+    title('Gravity Gradient [Nm]')
+    xlabel('Time (orbits)')
+    grid on;
 end
 
-figure(27);clf;
-plot(time/orb_period,vsun_torq(1,:),'r');hold on;
-plot(time/orb_period,vsun_torq(2,:),'g');hold on;
-plot(time/orb_period,vsun_torq(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Sun torque [Nm]')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['Cov_RMM_hat' timestamp '.png'], '-dpng')
-end
-figure(28);clf;
-plot(time/orb_period, vdrag_torq(1,:),'r');hold on;
-plot(time/orb_period, vdrag_torq(2,:),'g');hold on;
-plot(time/orb_period, vdrag_torq(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Drag torque [Nm]')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['drag_torq' timestamp '.png'], '-dpng')
-end
-figure(29);clf;
-plot(time/orb_period, vgrav_grad(1,:),'r');hold on;
-plot(time/orb_period, vgrav_grad(2,:),'g');hold on;
-plot(time/orb_period, vgrav_grad(3,:),'b');hold on;
-%plot(time/orb_period,maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-%plot(time/orb_period,-maxmagmom*ones(size(vext_torq(3,:))),'k--');hold on;
-title('Gravity Gradient [Nm]')
-xlabel('Time (orbits)')
-grid on;
-if SAVE_FIG == 1
-    print(gcf, ['drag_torq' timestamp '.png'], '-dpng')
-end
+
+
