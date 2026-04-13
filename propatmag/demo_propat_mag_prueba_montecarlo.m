@@ -30,9 +30,10 @@ RMM_COMPENSATE = 0;
 Q_ESTIMATE = 0;
 GRAPH_ESTIMATES = 0;
 
-MONTECARLO_ITERATIONS = 10;
+MONTECARLO_ITERATIONS = 1;
 
 for i=0:MONTECARLO_ITERATIONS
+
     %-------------------------------ORBITA-------------------------------------
     RE = 6378000;
     kepel = [RE + 700000, 0.01, 98*pi/180, 0, 0, 0];
@@ -58,7 +59,7 @@ for i=0:MONTECARLO_ITERATIONS
     quat = quat/norm(quat);
     
     % Angular velocity vector in body frame:
-    w_ang = [normrnd(1, 0.1), normrnd(1, 0.1), normrnd(1, 0.1)]'*pi/180;           % in radians/sec
+    w_ang = [normrnd(0, 3.3), normrnd(0, 3.3), normrnd(0, 3.3)]'*pi/180;           % in radians/sec
     
     % Initial control torque:
     contq = [0 0 0]';
@@ -80,7 +81,7 @@ for i=0:MONTECARLO_ITERATIONS
     % Propagation time in seconds:
     tstart = 0;              % initial time (sec)
     tstep = 2;               % step time (sec)
-    tend = 10*orb_period;    % end time (10 minutes)
+    tend = 3*orb_period;    % end time (10 minutes)
     
     %-----------------------------DINAMICA-------------------------------------
     
@@ -180,7 +181,7 @@ for i=0:MONTECARLO_ITERATIONS
     vsingularM_5 = 0;
     vsingularM_10 = 0;
     vsingularM_50 = 0;
-    vsun_torq = [0; 0; 0];
+    vsun_torq = [0; 0; 0];      
     vdrag_torq = [0; 0; 0];
     vgrav_grad = [0; 0; 0];
     vrmm_torq = [0; 0; 0];
@@ -349,7 +350,7 @@ for i=0:MONTECARLO_ITERATIONS
                 %[x_pred, sigma, phikm1, Q] = ekf_rmm(x_pred, (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, Q_min, alpha, R, tstep);
                 [ekf_rmm, phik] = update(ekf_rmm, mag_mom - mom_res, earth_field_b, dw);
                 [x_pred, sigma, Q] = get_estimates(ekf_rmm);
-                rmm_cov_diag = diag(sigma);
+                rmm_diag_cov = diag(sigma);
             end
     
             %---------------------MOMENTO MAGNÉTICO----------------------------
@@ -426,14 +427,16 @@ for i=0:MONTECARLO_ITERATIONS
         orbit = cat(2, orbit, stat');
         keorb = cat(2, keorb, kep2');
         vdq = [vdq dq];
-        vdqs = [vdqs dqs];
+        vdqs = [vdqs dqs]; 
         vdqs_true = [vdqs_true dqs_true];
         vdw = [vdw dw]; 
         vmag_mom = [vmag_mom mag_mom];
         vext_torq = [vext_torq ext_torq];
-        vrmm_hat = [vrmm_hat x_pred(4:6)];
-        vdw_hat = [vdw_hat x_pred(1:3)];
-        vrmm_diag_cov = [vrmm_diag_cov rmm_diag_cov];
+        if RMM_ESTIMATE
+            vrmm_hat = [vrmm_hat x_pred(4:6)];
+            vdw_hat = [vdw_hat x_pred(1:3)];
+            vrmm_diag_cov = [vrmm_diag_cov rmm_diag_cov];
+        end
         vrmm_torq = [vrmm_torq cross(mom_res, earth_field_b)];
         vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
         vsingularM_1 = [vsingularM_1; sing_O_1];
@@ -448,6 +451,22 @@ for i=0:MONTECARLO_ITERATIONS
         vgamma_avas(:,1) = vgamma_avas(:,2);
     
     end
+
+    writematrix(vdq, "mc/dq.csv", 'WriteMode', 'append')
+    writematrix(vdqs, "mc/dqs.csv", 'WriteMode', 'append')
+    writematrix(vdw, "mc/dw.csv", 'WriteMode', 'append')
+    writematrix(vmag_mom, "mc/mag_mom.csv", 'WriteMode', 'append')
+    writematrix(vext_torq, "mc/ext_torq.csv", 'WriteMode', 'append')
+    writematrix(vrmm_hat, "mc/drmm_hat.csv", 'WriteMode', 'append')
+    clear controller
+    clear vdq
+    clear vdqs
+    clear vdw
+    clear vmag_mom
+    clear vext_torq
+    clear vrmm_hat
+    
+
 
 end
     
