@@ -36,7 +36,14 @@ for i=0:MONTECARLO_ITERATIONS
 
     %-------------------------------ORBITA-------------------------------------
     RE = 6378000;
-    kepel = [RE + 700000, 0.01, 98*pi/180, 0, 0, 0];
+    kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 0];
+
+    writematrix(kepel, "mc/dq.csv")
+    writematrix(kepel, "mc/dqs.csv")
+    writematrix(kepel, "mc/dw.csv")
+    writematrix(kepel, "mc/mag_mom.csv")
+    writematrix(kepel, "mc/ext_torq.csv")
+    writematrix(kepel, "mc/rmm_hat.csv")
     
     % Orbit state vector:
     stat = kepel_statvec(kepel);
@@ -52,7 +59,7 @@ for i=0:MONTECARLO_ITERATIONS
     %--------------------------VALORES INICIALES-------------------------------
     
     % Attitude elements in Euler angles of a 3-1-3 (z-x-z) rotation
-    eulzxz = [unifrnd(-180, 180), unifrnd(0, 180), unifrnd(-180, 180)]'*pi/180;   % converted from degrees to radians
+    eulzxz = [0, 0, 0]'*pi/180;   % converted from degrees to radians
     
     % Attitude in quaternions
     quat = ezxzquat(eulzxz);        % converted from Euler angles
@@ -81,7 +88,7 @@ for i=0:MONTECARLO_ITERATIONS
     % Propagation time in seconds:
     tstart = 0;              % initial time (sec)
     tstep = 2;               % step time (sec)
-    tend = 3*orb_period;    % end time (10 minutes)
+    tend = 10*orb_period;    % end time (10 minutes)
     
     %-----------------------------DINAMICA-------------------------------------
     
@@ -166,7 +173,7 @@ for i=0:MONTECARLO_ITERATIONS
     maxmagmom = 0.1;       % Tope momento magnético en Am2
     vdq = [0;0;0];
     vdqs = [0;0;0];
-    vdw = [0;0;0];
+    vdw = w_ang;
     u = [0;0;0];
     vu = u;
     signq4 = 0;
@@ -451,6 +458,8 @@ for i=0:MONTECARLO_ITERATIONS
         vgamma_avas(:,1) = vgamma_avas(:,2);
     
     end
+
+  
 
     writematrix(vdq, "mc/dq.csv", 'WriteMode', 'append')
     writematrix(vdqs, "mc/dqs.csv", 'WriteMode', 'append')
