@@ -38,12 +38,14 @@ num_orbits = 3;
 
 info = [kepel, num_orbits];
 
-writematrix(info, "mc/dq.csv")
-writematrix(info, "mc/dqs.csv")
-writematrix(info, "mc/dw.csv")
-writematrix(info, "mc/mag_mom.csv")
-writematrix(info, "mc/ext_torq.csv")
-writematrix(info, "mc/rmm_hat.csv")
+mkdir("./mc", timestamp)
+
+writematrix(info, "mc/" + timestamp + "/dq.csv")
+writematrix(info, "mc/" + timestamp + "/dqs.csv")
+writematrix(info, "mc/" + timestamp + "/dw.csv")
+writematrix(info, "mc/" + timestamp + "/mag_mom.csv")
+writematrix(info, "mc/" + timestamp + "/ext_torq.csv")
+writematrix(info, "mc/" + timestamp + "/rmm_hat.csv")
 
 for i=0:MONTECARLO_ITERATIONS
 
@@ -465,12 +467,12 @@ for i=0:MONTECARLO_ITERATIONS
 
   
 
-    writematrix(vdq, "mc/dq.csv", 'WriteMode', 'append')
-    writematrix(vdqs, "mc/dqs.csv", 'WriteMode', 'append')
-    writematrix(vdw, "mc/dw.csv", 'WriteMode', 'append')
-    writematrix(vmag_mom, "mc/mag_mom.csv", 'WriteMode', 'append')
-    writematrix(vext_torq, "mc/ext_torq.csv", 'WriteMode', 'append')
-    writematrix(vrmm_hat, "mc/drmm_hat.csv", 'WriteMode', 'append')
+    writematrix(vdq, "mc/" + timestamp + "/dq.csv", 'WriteMode', 'append')
+    writematrix(vdqs, "mc/" + timestamp + "/dqs.csv", 'WriteMode', 'append')
+    writematrix(vdw, "mc/" + timestamp + "/dw.csv", 'WriteMode', 'append')
+    writematrix(vmag_mom, "mc/" + timestamp + "/mag_mom.csv", 'WriteMode', 'append')
+    writematrix(vext_torq, "mc/" + timestamp + "/ext_torq.csv", 'WriteMode', 'append')
+    writematrix(vrmm_hat, "mc/" + timestamp + "/drmm_hat.csv", 'WriteMode', 'append')
     clear controller
     clear vdq
     clear vdqs
