@@ -30,20 +30,24 @@ RMM_COMPENSATE = 0;
 Q_ESTIMATE = 0;
 GRAPH_ESTIMATES = 0;
 
-MONTECARLO_ITERATIONS = 1;
+MONTECARLO_ITERATIONS = 20;
+
+RE = 6378000;
+kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 0];
+num_orbits = 3;
+
+info = [kepel, num_orbits];
+
+writematrix(info, "mc/dq.csv")
+writematrix(info, "mc/dqs.csv")
+writematrix(info, "mc/dw.csv")
+writematrix(info, "mc/mag_mom.csv")
+writematrix(info, "mc/ext_torq.csv")
+writematrix(info, "mc/rmm_hat.csv")
 
 for i=0:MONTECARLO_ITERATIONS
 
     %-------------------------------ORBITA-------------------------------------
-    RE = 6378000;
-    kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 0];
-
-    writematrix(kepel, "mc/dq.csv")
-    writematrix(kepel, "mc/dqs.csv")
-    writematrix(kepel, "mc/dw.csv")
-    writematrix(kepel, "mc/mag_mom.csv")
-    writematrix(kepel, "mc/ext_torq.csv")
-    writematrix(kepel, "mc/rmm_hat.csv")
     
     % Orbit state vector:
     stat = kepel_statvec(kepel);
@@ -88,7 +92,7 @@ for i=0:MONTECARLO_ITERATIONS
     % Propagation time in seconds:
     tstart = 0;              % initial time (sec)
     tstep = 2;               % step time (sec)
-    tend = 10*orb_period;    % end time (10 minutes)
+    tend = num_orbits*orb_period;    % end time (10 minutes)
     
     %-----------------------------DINAMICA-------------------------------------
     
