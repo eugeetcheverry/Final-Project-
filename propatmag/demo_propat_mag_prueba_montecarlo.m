@@ -15,11 +15,11 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 %---------------------------CONFIGURACIÓN----------------------------------
 
 ECLIPSE = 1;
-RMM = 0;
-GRAV_GRAD = 0;
-SOLAR_TORQ = 0;
+RMM = 1;
+GRAV_GRAD = 1;
+SOLAR_TORQ = 1;
 DRAG = 1;
-GRAPH_PERTURBATIONS = 1;
+GRAPH_PERTURBATION S = 1;
 
 J_DIAGONAL = 0;
 SUN_POINTING = 1;
@@ -30,11 +30,11 @@ RMM_COMPENSATE = 0;
 Q_ESTIMATE = 0;
 GRAPH_ESTIMATES = 0;
 
-MONTECARLO_ITERATIONS = 20;
+MONTECARLO_ITERATIONS = 30;
 
 RE = 6378000;
 kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 0];
-num_orbits = 3;
+num_orbits = 4;
 
 info = [kepel, num_orbits];
 
@@ -94,7 +94,8 @@ for i=0:MONTECARLO_ITERATIONS
     % Propagation time in seconds:
     tstart = 0;              % initial time (sec)
     tstep = 2;               % step time (sec)
-    tend = num_orbits*orb_period;    % end time (10 minutes)
+    t_middle= 0.5*num_orbits*orb_period;
+    tend = num_orbits*orb_period;    % end time
     
     %-----------------------------DINAMICA-------------------------------------
     
@@ -288,6 +289,12 @@ for i=0:MONTECARLO_ITERATIONS
     
             dq = quat(1:3);
             dw = w_ang;
+            
+            %Switch a nadir pointing a mitad de simulacion
+            if t_middle == t
+                NADIR_POINTING=1;
+                SUN_POINTING=0;
+            end
             
             % Error en base al modo
             if SUN_POINTING  %Se configura que apunte solo al sol, dqs se actualiza siempre
