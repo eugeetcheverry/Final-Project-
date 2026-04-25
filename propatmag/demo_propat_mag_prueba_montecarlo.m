@@ -15,9 +15,9 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 %---------------------------CONFIGURACIÓN----------------------------------
 
 ECLIPSE = 1;
-RMM = 0;
-GRAV_GRAD = 0;
-SOLAR_TORQ = 0;
+RMM = 1;
+GRAV_GRAD = 1;
+SOLAR_TORQ = 1;
 DRAG = 1;
 GRAPH_PERTURBATIONS = 1;
 
@@ -25,16 +25,16 @@ J_DIAGONAL = 0;
 SUN_POINTING = 1;
 NADIR_POINTING = 0;
 
-RMM_ESTIMATE = 0;
-RMM_COMPENSATE = 0;
-Q_ESTIMATE = 0;
-GRAPH_ESTIMATES = 0;
+RMM_ESTIMATE = 1;
+RMM_COMPENSATE = 1;
+Q_ESTIMATE = 1;
+GRAPH_ESTIMATES = 1;
 
-MONTECARLO_ITERATIONS = 20;
+MONTECARLO_ITERATIONS = 100;
 
 RE = 6378000;
 kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 0];
-num_orbits = 3;
+num_orbits = 10;
 
 info = [kepel, num_orbits];
 
@@ -448,7 +448,7 @@ for i=0:MONTECARLO_ITERATIONS
         if RMM_ESTIMATE
             vrmm_hat = [vrmm_hat x_pred(4:6)];
             vdw_hat = [vdw_hat x_pred(1:3)];
-            vrmm_diag_cov = [vrmm_diag_cov rmm_diag_cov];
+            vrmm_diag_cov = [vrmm_diag_cov rmm_diag_cov(4:6)];
         end
         vrmm_torq = [vrmm_torq cross(mom_res, earth_field_b)];
         vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
