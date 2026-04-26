@@ -47,6 +47,7 @@ writematrix(info, "mc/" + timestamp + "/mag_mom.csv")
 writematrix(info, "mc/" + timestamp + "/ext_torq.csv")
 writematrix(info, "mc/" + timestamp + "/rmm_hat.csv")
 writematrix(info, "mc/" + timestamp + "/current.csv")
+writematrix(info, "mc/" + timestamp + "/dqs_true.csv")
 
 % ---------------------------ACTUATORS------------------------------
 
@@ -117,6 +118,7 @@ for i=0:MONTECARLO_ITERATIONS
     % Magnetic moment torque flag and moment:
     flag_mag = 1;   % 1=compute magnetic moment / 0=discard magnetic moment
     mag_mom = [0; 0; 0];      % in A.m
+    act_mag_mom = [0; 0; 0];
     
     % ODE solver precision:
     options = odeset('abstol', 1e-4, 'reltol', 1e-4);
@@ -193,6 +195,7 @@ for i=0:MONTECARLO_ITERATIONS
     signq4 = 0;
     vext_torq = u;
     vmag_mom = u;
+    vact_mag_mom = [0; 0; 0];
     vrmm_hat = [0;0;0];
     vdw_hat = [0;0;0];
     vrmm_diag_cov = [sigma(4,4); sigma(5,5); sigma(6,6)];
@@ -312,7 +315,7 @@ for i=0:MONTECARLO_ITERATIONS
                     dqn = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
                 end
             end
-            if NADIR_POINTING && no_horizon==0 %Se configura apuntamiento solo a nadir, se actualiza solo si se ve el horizonte
+            if NADIR_POINTING %Se configura apuntamiento solo a nadir, se actualiza solo si se ve el horizonte
                 if no_horizon == 0
                     dqn = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
                 end
@@ -395,6 +398,7 @@ for i=0:MONTECARLO_ITERATIONS
             normb2 = norm(earth_field)^2;
     
             mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res - RMM_COMPENSATE*x_pred(4:6);
+            act_mag_mom = mag_mom - mom_res;
             
             
             if max(abs(mag_mom)) > maxmagmom             % torqrod saturation with bisection
@@ -468,6 +472,7 @@ for i=0:MONTECARLO_ITERATIONS
         vdqs_true = [vdqs_true dqs_true];
         vdw = [vdw dw]; 
         vmag_mom = [vmag_mom mag_mom];
+        vact_mag_mom = [vact_mag_mom act_mag_mom];
         vext_torq = [vext_torq ext_torq];
         if RMM_ESTIMATE
             vrmm_hat = [vrmm_hat x_pred(4:6)];
@@ -488,7 +493,7 @@ for i=0:MONTECARLO_ITERATIONS
         vgamma_avas(:,1) = vgamma_avas(:,2);
     
     end
-    vcurrent = vmag_mom / magnetorquer_area;
+    vcurrent = vact_mag_mom / magnetorquer_area;
   
 
     writematrix(vdq, "mc/" + timestamp + "/dq.csv", 'WriteMode', 'append')
@@ -498,6 +503,7 @@ for i=0:MONTECARLO_ITERATIONS
     writematrix(vext_torq, "mc/" + timestamp + "/ext_torq.csv", 'WriteMode', 'append')
     writematrix(vrmm_hat, "mc/" + timestamp + "/drmm_hat.csv", 'WriteMode', 'append')
     writematrix(vcurrent, "mc/" + timestamp + "/current.csv", 'WriteMode', 'append')
+    writematrix(vdqs_true, "mc/" + timestamp + "/dqs_true.csv", 'WriteMode', 'append')
     clear controller
     clear vdq
     clear vdqs
