@@ -19,22 +19,22 @@ RMM = 1;
 GRAV_GRAD = 1;
 SOLAR_TORQ = 1;
 DRAG = 1;
-GRAPH_PERTURBATION S = 1;
+GRAPH_PERTURBATIONS = 1;
 
 J_DIAGONAL = 0;
 SUN_POINTING = 1;
 NADIR_POINTING = 0;
 
-RMM_ESTIMATE = 0;
-RMM_COMPENSATE = 0;
-Q_ESTIMATE = 0;
+RMM_ESTIMATE = 1;
+RMM_COMPENSATE = 1;
+Q_ESTIMATE = 1;
 GRAPH_ESTIMATES = 0;
 
-MONTECARLO_ITERATIONS = 30;
+MONTECARLO_ITERATIONS = 100;
 
 RE = 6378000;
-kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 0];
-num_orbits = 4;
+kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 10*pi/180];
+num_orbits = 10;
 
 info = [kepel, num_orbits];
 
@@ -46,6 +46,10 @@ writematrix(info, "mc/" + timestamp + "/dw.csv")
 writematrix(info, "mc/" + timestamp + "/mag_mom.csv")
 writematrix(info, "mc/" + timestamp + "/ext_torq.csv")
 writematrix(info, "mc/" + timestamp + "/rmm_hat.csv")
+writematrix(info, "mc/" + timestamp + "/current.csv")
+
+% ---------------------------ACTUATORS------------------------------
+
 
 for i=0:MONTECARLO_ITERATIONS
 
@@ -177,7 +181,9 @@ for i=0:MONTECARLO_ITERATIONS
     gamma = 0*eye(3);
     gamma_acum = 0*eye(3);
     gamavg = 0*eye(3);      % Gamma avg inicial
-    maxmagmom = 0.1;       % Tope momento magnético en Am2
+    maxmagmom = 0.2;       % Tope momento magnético en Am2
+    magnetorquer_max_current = 28e-3; %in meters
+    magnetorquer_area = maxmagmom/magnetorquer_max_current;
     vdq = [0;0;0];
     vdqs = [0;0;0];
     vdw = w_ang;
@@ -201,6 +207,7 @@ for i=0:MONTECARLO_ITERATIONS
     vrmm_torq = [0; 0; 0];
     vdqs_true = [0; 0; 0];
     vgamma_avas = [0; 0; 0];
+
     %------------------------------SIMULACION----------------------------------
     
     for t = tstart:tstep:tend
@@ -291,17 +298,24 @@ for i=0:MONTECARLO_ITERATIONS
             dw = w_ang;
             
             %Switch a nadir pointing a mitad de simulacion
-            if t_middle == t
+            if t_middle < t
                 NADIR_POINTING=1;
                 SUN_POINTING=0;
+            else
+                NADIR_POINTING=0;
+                SUN_POINTING=1;
             end
             
+            %Calculo de los cuaterniones parciales
+            dq_sun = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
+            dq_nadir = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]); % Save nadr partial quaternion
+
             % Error en base al modo
             if SUN_POINTING  %Se configura que apunte solo al sol, dqs se actualiza siempre
-                dqs = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
+                dqs = dq_sun;
             end
-            if NADIR_POINTING && no_horizon==0 %Se configura apuntamiento solo a nadir, se actualiza solo si se ve el horizonte
-                dqs = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
+            if NADIR_POINTING && no_horizon == 0 %Se acualiza solo si se ve el horizonte
+                dqs = dq_nadir;
             end
             if SUN_POINTING==0 && NADIR_POINTING==0 %No hay apuntamiento, solo detumbling
                 dqs = [0; 0; 0];
@@ -313,10 +327,10 @@ for i=0:MONTECARLO_ITERATIONS
     
     
             if SUN_POINTING % Se calculan los errores verdaderos
-                dqs_true = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
+                dqs_true = dq_sun;
             end
             if NADIR_POINTING
-                dqs_true = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]);
+                dqs_true = dq_nadir;
             end
             if SUN_POINTING==0 && NADIR_POINTING==0
                 dqs_true = [0; 0; 0];
@@ -325,7 +339,6 @@ for i=0:MONTECARLO_ITERATIONS
             versors_ = dqs_true/norm(dqs_true);
             dqs_true = sin(angles_/2)*versors_; 
            
-    
             % Marcar fin del detumbling
             if (norm(dw)<0.0005 && dqs4*dqs4>0.1 && signq4==0) 
                signq4=sign(dqs4);
@@ -378,6 +391,7 @@ for i=0:MONTECARLO_ITERATIONS
             normb2 = norm(earth_field)^2;
     
             mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res - RMM_COMPENSATE*x_pred(4:6);
+            act_mag_mom = mag_mom - mom_res;
             
             
             if max(abs(mag_mom)) > maxmagmom             % torqrod saturation with bisection
@@ -432,7 +446,7 @@ for i=0:MONTECARLO_ITERATIONS
     
         end
         
-        t
+        [i, t]
     
         att_vec = Y(3, :)';         % propagated attitude vector
         quat = att_vec(1:4);        % propagated quaternion
@@ -451,11 +465,12 @@ for i=0:MONTECARLO_ITERATIONS
         vdqs_true = [vdqs_true dqs_true];
         vdw = [vdw dw]; 
         vmag_mom = [vmag_mom mag_mom];
+        vact_mag_mom = [vact_mag_mom act_mag_mom];
         vext_torq = [vext_torq ext_torq];
         if RMM_ESTIMATE
             vrmm_hat = [vrmm_hat x_pred(4:6)];
             vdw_hat = [vdw_hat x_pred(1:3)];
-            vrmm_diag_cov = [vrmm_diag_cov rmm_diag_cov];
+            vrmm_diag_cov = [vrmm_diag_cov rmm_diag_cov(4:6)];
         end
         vrmm_torq = [vrmm_torq cross(mom_res, earth_field_b)];
         vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
@@ -471,7 +486,7 @@ for i=0:MONTECARLO_ITERATIONS
         vgamma_avas(:,1) = vgamma_avas(:,2);
     
     end
-
+    vcurrent = vact_mag_mom / magnetorquer_area;
   
 
     writematrix(vdq, "mc/" + timestamp + "/dq.csv", 'WriteMode', 'append')
@@ -480,6 +495,8 @@ for i=0:MONTECARLO_ITERATIONS
     writematrix(vmag_mom, "mc/" + timestamp + "/mag_mom.csv", 'WriteMode', 'append')
     writematrix(vext_torq, "mc/" + timestamp + "/ext_torq.csv", 'WriteMode', 'append')
     writematrix(vrmm_hat, "mc/" + timestamp + "/drmm_hat.csv", 'WriteMode', 'append')
+    writematrix(vcurrent, "mc/" + timestamp + "/current.csv", 'WriteMode', 'append')
+    writematrix(vdqs_true, "mc/" + timestamp + "/dqs_true.csv", 'WriteMode', 'append')
     clear controller
     clear vdq
     clear vdqs
