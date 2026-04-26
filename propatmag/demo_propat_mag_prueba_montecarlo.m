@@ -310,13 +310,14 @@ for i=0:MONTECARLO_ITERATIONS
             
             %Calculo de los cuaterniones parciales
             dq_sun = cross(quatrmx(quat)*sun_dir(mjd, dfra+t),[0;0;1]);
-            dq_nadir = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]); % Save nadr partial quaternion
-
+            if no_horizon == 0
+                dq_nadir = cross(quatrmx(quat)*stat(1:3)'/norm(stat(1:3)),[0;0;-1]); % Save nadr partial quaternion
+            end
             % Error en base al modo
             if SUN_POINTING  %Se configura que apunte solo al sol, dqs se actualiza siempre
                 dqs = dq_sun;
             end
-            if NADIR_POINTING && no_horizon == 0 %Se acualiza solo si se ve el horizonte
+            if NADIR_POINTING %Se acualiza solo si se ve el horizonte
                 dqs = dq_nadir;
             end
             if SUN_POINTING==0 && NADIR_POINTING==0 %No hay apuntamiento, solo detumbling
