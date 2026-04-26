@@ -42,6 +42,7 @@ mkdir("./mc", timestamp)
 
 writematrix(info, "mc/" + timestamp + "/dq.csv")
 writematrix(info, "mc/" + timestamp + "/dqs.csv")
+writematrix(info, "mc/" + timestamp + "/dqs_true.csv")
 writematrix(info, "mc/" + timestamp + "/dw.csv")
 writematrix(info, "mc/" + timestamp + "/mag_mom.csv")
 writematrix(info, "mc/" + timestamp + "/ext_torq.csv")
@@ -207,6 +208,7 @@ for i=0:MONTECARLO_ITERATIONS
     vrmm_torq = [0; 0; 0];
     vdqs_true = [0; 0; 0];
     vgamma_avas = [0; 0; 0];
+    vact_mag_mom = [0; 0; 0];
 
     %------------------------------SIMULACION----------------------------------
     
