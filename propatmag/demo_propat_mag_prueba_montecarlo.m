@@ -33,7 +33,7 @@ GRAPH_ESTIMATES = 0;
 MONTECARLO_ITERATIONS = 100;
 
 RE = 6378000;
-kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, 10*pi/180];
+kepel = [RE + 400000, 0.01, 98*pi/180, 0, 0, -20*pi/180];
 num_orbits = 10;
 
 info = [kepel, num_orbits];
@@ -501,12 +501,13 @@ for i=0:MONTECARLO_ITERATIONS
     writematrix(vdw, "mc/" + timestamp + "/dw.csv", 'WriteMode', 'append')
     writematrix(vmag_mom, "mc/" + timestamp + "/mag_mom.csv", 'WriteMode', 'append')
     writematrix(vext_torq, "mc/" + timestamp + "/ext_torq.csv", 'WriteMode', 'append')
-    writematrix(vrmm_hat, "mc/" + timestamp + "/drmm_hat.csv", 'WriteMode', 'append')
+    writematrix(vrmm_hat, "mc/" + timestamp + "/rmm_hat.csv", 'WriteMode', 'append')
     writematrix(vcurrent, "mc/" + timestamp + "/current.csv", 'WriteMode', 'append')
     writematrix(vdqs_true, "mc/" + timestamp + "/dqs_true.csv", 'WriteMode', 'append')
     clear controller
     clear vdq
     clear vdqs
+    clear vdqs_true
     clear vdw
     clear vmag_mom
     clear vext_torq
