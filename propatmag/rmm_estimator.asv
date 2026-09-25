@@ -28,10 +28,6 @@ classdef rmm_estimator
             obj.controller = controller;
             
         end
-
-        function obj = set_init(obj, x_init)
-            obj.x = x_init;
-        end
         
         function [obj, phikm1] = update(obj, mag_mom, earth_field_b, z)
             
@@ -72,12 +68,11 @@ classdef rmm_estimator
             %Cambiado respecto del paper, se usa la sensibilidad (robotica) en vez
             %de solo la R
             K = sigma_hat*obj.H'/(obj.H*sigma_hat*obj.H' + obj.R);
-            dy = z - obj.H*x_hat;
 
-            obj.x = x_hat + K*dy;
+            obj.x = x_hat + K*(z - obj.H*x_hat);
             obj.sigma = (eye(6) - K*obj.H)*sigma_hat;
             
-            
+            dy = z - obj.H*x_hat;
             Q_avg = K*(dy*dy')*K';
             obj.Q = (1-obj.alpha)*obj.Q + (obj.alpha)*(obj.Q_min + Q_avg);
 
