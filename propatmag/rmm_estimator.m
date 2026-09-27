@@ -5,9 +5,11 @@ classdef rmm_estimator
         Q
         Q_min
         R
+        R_min
         H
         iner
-        alpha
+        alpha_q
+        alpha_r
         controller
         dt
         
@@ -15,14 +17,16 @@ classdef rmm_estimator
     
     methods
         
-        function obj = rmm_estimator(x_init, sigma_init, Q_init, R_init, H, Q_min, alpha, iner, controller, dt)
+        function obj = rmm_estimator(x_init, sigma_init, Q_init, R_init, H, Q_min, R_min, alpha_q, alpha_r, iner, controller, dt)
             obj.x = x_init;
             obj.sigma = sigma_init;
             obj.Q = Q_init;
             obj.R = R_init;
             obj.iner = iner;
-            obj.alpha = alpha;
+            obj.alpha_q = alpha_q;
+            obj.alpha_r = alpha_r;
             obj.Q_min = Q_min;
+            obj.R_min = R_min;
             obj.H = H;
             obj.dt = dt;
             obj.controller = controller;
@@ -79,7 +83,12 @@ classdef rmm_estimator
             
             
             Q_avg = K*(dy*dy')*K';
-            obj.Q = (1-obj.alpha)*obj.Q + (obj.alpha)*(obj.Q_min + Q_avg);
+            obj.Q = (1-obj.alpha_q)*obj.Q + (obj.alpha_q)*(Q_avg + obj.Q_min);
+
+            res = z - obj.H*obj.x;
+            obj.R = (1-obj.alpha_r)*obj.R + (obj.alpha_r)*(res*res' + obj.H*sigma_hat*obj.H' + obj.R_min);
+
+
 
             %Cosas que no andan:
             %Runge para orden 4 para la integracion del sistema no lineal
@@ -95,10 +104,11 @@ classdef rmm_estimator
             %Realizacion de montecarlo
         end
         
-        function [x, sigma, Q] = get_estimates(obj)
+        function [x, sigma, Q, R] = get_estimates(obj)
             x = obj.x;
             sigma = obj.sigma;
             Q = obj.Q;
+            R = obj.R;
         end
         
     end
