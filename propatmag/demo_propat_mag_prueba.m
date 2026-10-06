@@ -15,19 +15,20 @@ timestamp = datestr(now,'yyyymmdd_HHMMSS');
 %---------------------------CONFIGURACIÓN----------------------------------
 
 ECLIPSE = 1;
-RMM = 0;
-GRAV_GRAD = 0;
-SOLAR_TORQ = 0;
+RMM = 1;
+GRAV_GRAD = 1;
+SOLAR_TORQ = 1;
 DRAG = 1;
-GRAPH_PERTURBATIONS = 1;
+GRAPH_PERTURBATIONS = 0;
 
 J_DIAGONAL = 0;
 SUN_POINTING = 1;
 NADIR_POINTING = 0;
 
-RMM_ESTIMATE = 0;
-RMM_COMPENSATE = 0;
-Q_ESTIMATE = 0;
+RMM_ESTIMATE = 1;
+RMM_COMPENSATE = 1;
+Q_ESTIMATE = 1;
+R_ESTIMATE = 1;
 GRAPH_ESTIMATES = 1;
 
 %-------------------------------ORBITA-------------------------------------
@@ -55,7 +56,7 @@ quat = ezxzquat(eulzxz);        % converted from Euler angles
 quat = quat/norm(quat);
 
 % Angular velocity vector in body frame:
-w_ang = [1, 1, 1]'*pi/180;           % in radians/sec
+w_ang = [10, 10, 10]'*pi/180;           % in radians/sec
 
 % Initial control torque:
 contq = [0 0 0]';
@@ -76,8 +77,8 @@ dfra = time_to_dayf (10, 20, 0);    % UTC time in (hour, minute, sec)
 
 % Propagation time in seconds:
 tstart = 0;              % initial time (sec)
-tstep = 3;               % step time (sec)
-tend = 10*orb_period;    % end time (10 minutes)
+tstep = 1;               % step time (sec)
+tend = 5*orb_period;    % end time (10 minutes)
 
 %-----------------------------DINAMICA-------------------------------------
 
@@ -103,7 +104,7 @@ earthradius = 6371000;
 %------------------------------CONTROLADOR---------------------------------
 
 k_p = 0.000025;
-k_v = 0.3; 
+k_v = 0.33; 
 eps = 0.01;            
 
 controller = controller(k_p, k_v, eps, iner);
@@ -112,20 +113,24 @@ controller = controller(k_p, k_v, eps, iner);
 
 H = [eye(3) zeros(3)];
 Q = [0.0001^2*eye(3) zeros(3)
-    zeros(3) 0.001^2*eye(3)];
+    zeros(3) 0.001^2*eye(3)] * 0.01;
 Q_min = Q;
-
-alpha = 0;
-if Q_ESTIMATE
-    alpha = 0.001;
-end
-
 R = 0.01*eye(3);
+R_min = R*0.1;
+
+alpha_q = 0;
+alpha_r = 0;
+if Q_ESTIMATE
+    alpha_q = 0.01;
+end
+if R_ESTIMATE
+    alpha_r = 0.01;
+end
 
 x_pred = [0; 0; 0; 0; 0; 0];
 sigma = [[eye(3)*0.00001^2 zeros(3)];[zeros(3) eye(3)*0.001^2]]*2000;
 
-ekf_rmm = rmm_estimator(x_pred, sigma, Q, R, H, Q_min, alpha, iner, controller, tstep);
+ekf_rmm = rmm_estimator(x_pred, sigma, Q, R, H, Q_min, R_min, alpha_q, alpha_r, iner, controller, tstep);
 
 %------------------------------OBSERVABILIDAD------------------------------
 
@@ -159,7 +164,7 @@ keorb = kepel';         % Orbit elements (keplerian)
 gamma = 0*eye(3);
 gamma_acum = 0*eye(3);
 gamavg = 0*eye(3);      % Gamma avg inicial
-maxmagmom = 0.1;       % Tope momento magnético en Am2
+maxmagmom = 0.2;       % Tope momento magnético en Am2
 vdq = [0;0;0];
 vdqs = [0;0;0];
 vdw = [0;0;0];
@@ -172,6 +177,7 @@ vrmm_hat = [0;0;0];
 vdw_hat = [0;0;0];
 vrmm_diag_cov = [sigma(4,4); sigma(5,5); sigma(6,6)];
 vQ = [Q(4,4); Q(5,5); Q(6,6)];
+vR = [R(1,1); R(2,2); R(3,3)];
 vsingularM_1 = 0;
 vsingularM_2 = 0;
 vsingularM_5 = 0;
@@ -271,7 +277,12 @@ for t = tstart:tstep:tend
         
 
         dq = quat(1:3);
-        dw = w_ang;
+        dw = w_ang + randn(3, 1)*0.0014;
+
+        if t == tstart
+            x_init = [0; 0; 0; 0; 0; 0];
+            ekf_rmm = set_init(ekf_rmm, x_init);
+        end
         
         % Error en base al modo
         if SUN_POINTING  %Se configura que apunte solo al sol, dqs se actualiza siempre
@@ -310,8 +321,8 @@ for t = tstart:tstep:tend
 
         % Acualizar ganancias según el modo
         if SUN_POINTING && signq4*signq4>0
-            k_p = 0.000025;% ganancia proporcional
-            k_v = 0.3; % ganancia derivativa
+            k_p = 0.0000227;% ganancia proporcional
+            k_v = 0.33; % ganancia derivativa
             if eclipse 
                 eps = 0.03;% epsilon
             else
@@ -320,12 +331,12 @@ for t = tstart:tstep:tend
         end 
         if NADIR_POINTING && signq4*signq4>0
             if no_horizon
-                k_p = 0.0000025;% ganancia proporcional
-                k_v = 0.4; % ganancia derivativa
+                k_p = 0.00000227;% ganancia proporcional
+                k_v = 0.44; % ganancia derivativa
                 eps = 0.01;%epsilon
             else
-                k_p = 0.000025;% ganancia proporcional
-                k_v = 0.3; % ganancia derivativa
+                k_p = 0.0000227;% ganancia proporcional
+                k_v = 0.33; % ganancia derivativa
                 eps = 0.02;%epsilon
             end
         end
@@ -338,7 +349,7 @@ for t = tstart:tstep:tend
         end
         
         % Generar acción de control
-        u = get_control_action(controller, dqs, signq4, dw, pointing);
+        u = get_control_action(controller, dqs, signq4, x_pred(1:3), pointing);
         
         %----------------ESTIMACION DE MOMENTO RESIDUAL--------------------
         phik = 0;
@@ -346,7 +357,7 @@ for t = tstart:tstep:tend
         if RMM_ESTIMATE == 1
             %[x_pred, sigma, phikm1, Q] = ekf_rmm(x_pred, (mag_mom - mom_res), iner, earth_field_b, sigma, dw, Q, Q_min, alpha, R, tstep);
             [ekf_rmm, phik] = update(ekf_rmm, mag_mom - mom_res, earth_field_b, dw);
-            [x_pred, sigma, Q] = get_estimates(ekf_rmm);
+            [x_pred, sigma, Q, R] = get_estimates(ekf_rmm);
             rmm_cov_diag = [sigma(4,4); sigma(5,5); sigma(6,6)];
         end
 
@@ -354,7 +365,7 @@ for t = tstart:tstep:tend
         
         normb2 = norm(earth_field)^2;
 
-        mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res - RMM_COMPENSATE*x_pred(4:6);
+        mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res - (t > orb_period)*RMM_COMPENSATE*x_pred(4:6);
         
         
         if max(abs(mag_mom)) > maxmagmom             % torqrod saturation with bisection
@@ -427,13 +438,14 @@ for t = tstart:tstep:tend
     vdqs = [vdqs dqs];
     vdqs_true = [vdqs_true dqs_true];
     vdw = [vdw dw]; 
-    vmag_mom = [vmag_mom mag_mom];
+    vmag_mom = [vmag_mom (mag_mom - mom_res)];
     vext_torq = [vext_torq ext_torq];
     vrmm_hat = [vrmm_hat x_pred(4:6)];
     vdw_hat = [vdw_hat x_pred(1:3)];
     vrmm_diag_cov = [vrmm_diag_cov rmm_cov_diag];
     vrmm_torq = [vrmm_torq cross(mom_res, earth_field_b)];
     vQ = [vQ [Q(4,4); Q(5,5); Q(6,6)]];
+    vR = [vR [R(1,1); R(2,2); R(3,3)]];
     vsingularM_1 = [vsingularM_1; sing_O_1];
     vsingularM_2 = [vsingularM_2; sing_O_2];
     vsingularM_5 = [vsingularM_5; sing_O_5];
@@ -467,7 +479,7 @@ plot(time/orb_period, vdqs(3,:),'b--');hold on;
 plot(time/orb_period, vdqs_true(1,:),'r');hold on;
 plot(time/orb_period, vdqs_true(2,:),'g');hold on;
 plot(time/orb_period, vdqs_true(3,:),'b');hold on;
-plot(time/orb_period, veclipse, 'Color', '#FF8800');hold on;
+%plot(time/orb_period, veclipse, 'Color', '#FF8800');hold on;
 xlabel('Time (orbits)')
 ylabel('Quaternion 1-3')
 title('Attitude in partial quaternion vector');
@@ -529,11 +541,11 @@ if GRAPH_ESTIMATES
     grid on;
     
     
-    figure(25);clf;
-    plot(time/orb_period,vQ(1,:),'r');hold on;
-    plot(time/orb_period,vQ(2,:),'g');hold on;
-    plot(time/orb_period,vQ(3,:),'b');hold on;
-    title('Estimated Q [Am2]')
+    figure(31);clf;
+    plot(time/orb_period,vR(1,:),'r');hold on;
+    plot(time/orb_period,vR(2,:),'g');hold on;
+    plot(time/orb_period,vR(3,:),'b');hold on;
+    title('Estimated R [Am2]')
     xlabel('Time (orbits)')
     grid on;
 
@@ -545,6 +557,14 @@ if GRAPH_ESTIMATES
     plot(time/orb_period,vsingularM_50);hold on;
     legend('$O_1$', '$O_2$', '$O_5$', '$O_{10}$', '$O_{50}$' ,'Interpreter', 'latex')
     title('Minimum singular values of $O_{\tau}$', 'Interpreter', 'latex')
+    xlabel('Time (orbits)')
+    grid on;
+
+    figure(25);clf;
+    plot(time/orb_period,vQ(1,:),'r');hold on;
+    plot(time/orb_period,vQ(2,:),'g');hold on;
+    plot(time/orb_period,vQ(3,:),'b');hold on;
+    title('Estimated Q [Am2]')
     xlabel('Time (orbits)')
     grid on;
 end

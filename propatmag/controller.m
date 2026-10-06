@@ -1,4 +1,4 @@
-classdef controller
+classdef controller < handle
     properties
         k_p
         k_v

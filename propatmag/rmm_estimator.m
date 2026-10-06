@@ -5,9 +5,11 @@ classdef rmm_estimator
         Q
         Q_min
         R
+        R_min
         H
         iner
-        alpha
+        alpha_q
+        alpha_r
         controller
         dt
         
@@ -15,18 +17,24 @@ classdef rmm_estimator
     
     methods
         
-        function obj = rmm_estimator(x_init, sigma_init, Q_init, R_init, H, Q_min, alpha, iner, controller, dt)
+        function obj = rmm_estimator(x_init, sigma_init, Q_init, R_init, H, Q_min, R_min, alpha_q, alpha_r, iner, controller, dt)
             obj.x = x_init;
             obj.sigma = sigma_init;
             obj.Q = Q_init;
             obj.R = R_init;
             obj.iner = iner;
-            obj.alpha = alpha;
+            obj.alpha_q = alpha_q;
+            obj.alpha_r = alpha_r;
             obj.Q_min = Q_min;
+            obj.R_min = R_min;
             obj.H = H;
             obj.dt = dt;
             obj.controller = controller;
             
+        end
+
+        function obj = set_init(obj, x_init)
+            obj.x = x_init;
         end
         
         function [obj, phikm1] = update(obj, mag_mom, earth_field_b, z)
@@ -63,18 +71,24 @@ classdef rmm_estimator
             
             %Pasito de prediccion
             x_hat = [w; rmm] + xdot_hat*obj.dt;
-            sigma_hat = phikm1*obj.sigma*phikm1' + gammkm1*obj.Q*gammkm1';
+            sigma_hat = phikm1*obj.sigma*phikm1' + gammkm1*obj.Q*inv(gammkm1);
 
             %Cambiado respecto del paper, se usa la sensibilidad (robotica) en vez
             %de solo la R
             K = sigma_hat*obj.H'/(obj.H*sigma_hat*obj.H' + obj.R);
+            dy = z - obj.H*x_hat;
 
-            obj.x = x_hat + K*(z - obj.H*x_hat);
+            obj.x = x_hat + K*dy;
             obj.sigma = (eye(6) - K*obj.H)*sigma_hat;
             
-            dy = z - obj.H*obj.x;
-            Q_avg = (K*dy)*(K*dy)';
-            obj.Q = (1-obj.alpha)*obj.Q + (obj.alpha)*(obj.Q_min + Q_avg);
+            
+            Q_avg = K*(dy*dy')*K';
+            obj.Q = (1-obj.alpha_q)*obj.Q + (obj.alpha_q)*(Q_avg + obj.Q_min);
+
+            res = z - obj.H*obj.x;
+            obj.R = (1-obj.alpha_r)*obj.R + (obj.alpha_r)*(res*res' + obj.H*sigma_hat*obj.H' + obj.R_min);
+
+
 
             %Cosas que no andan:
             %Runge para orden 4 para la integracion del sistema no lineal
@@ -90,10 +104,11 @@ classdef rmm_estimator
             %Realizacion de montecarlo
         end
         
-        function [x, sigma, Q] = get_estimates(obj)
+        function [x, sigma, Q, R] = get_estimates(obj)
             x = obj.x;
             sigma = obj.sigma;
             Q = obj.Q;
+            R = obj.R;
         end
         
     end
