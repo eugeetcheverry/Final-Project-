@@ -56,7 +56,7 @@ quat = ezxzquat(eulzxz);        % converted from Euler angles
 quat = quat/norm(quat);
 
 % Angular velocity vector in body frame:
-w_ang = [1, 1, 1]'*pi/180;           % in radians/sec
+w_ang = [10, 10, 10]'*pi/180;           % in radians/sec
 
 % Initial control torque:
 contq = [0 0 0]';
@@ -104,7 +104,7 @@ earthradius = 6371000;
 %------------------------------CONTROLADOR---------------------------------
 
 k_p = 0.000025;
-k_v = 0.3; 
+k_v = 0.33; 
 eps = 0.01;            
 
 controller = controller(k_p, k_v, eps, iner);
@@ -115,7 +115,7 @@ H = [eye(3) zeros(3)];
 Q = [0.0001^2*eye(3) zeros(3)
     zeros(3) 0.001^2*eye(3)] * 0.01;
 Q_min = Q;
-R = 0.5*eye(3);
+R = 0.01*eye(3);
 R_min = R*0.1;
 
 alpha_q = 0;
@@ -277,10 +277,10 @@ for t = tstart:tstep:tend
         
 
         dq = quat(1:3);
-        dw = w_ang + randn(1)*0.0014;
+        dw = w_ang + randn(3, 1)*0.0014;
 
         if t == tstart
-            x_init = [dw; 0; 0; 0];
+            x_init = [0; 0; 0; 0; 0; 0];
             ekf_rmm = set_init(ekf_rmm, x_init);
         end
         
@@ -321,8 +321,8 @@ for t = tstart:tstep:tend
 
         % Acualizar ganancias según el modo
         if SUN_POINTING && signq4*signq4>0
-            k_p = 0.000025;% ganancia proporcional
-            k_v = 0.3; % ganancia derivativa
+            k_p = 0.0000227;% ganancia proporcional
+            k_v = 0.33; % ganancia derivativa
             if eclipse 
                 eps = 0.03;% epsilon
             else
@@ -331,12 +331,12 @@ for t = tstart:tstep:tend
         end 
         if NADIR_POINTING && signq4*signq4>0
             if no_horizon
-                k_p = 0.0000025;% ganancia proporcional
-                k_v = 0.4; % ganancia derivativa
+                k_p = 0.00000227;% ganancia proporcional
+                k_v = 0.44; % ganancia derivativa
                 eps = 0.01;%epsilon
             else
-                k_p = 0.000025;% ganancia proporcional
-                k_v = 0.3; % ganancia derivativa
+                k_p = 0.0000227;% ganancia proporcional
+                k_v = 0.33; % ganancia derivativa
                 eps = 0.02;%epsilon
             end
         end
@@ -365,7 +365,7 @@ for t = tstart:tstep:tend
         
         normb2 = norm(earth_field)^2;
 
-        mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res - RMM_COMPENSATE*x_pred(4:6);
+        mag_mom = 1/normb2 * cross(earth_field_b, u) + mom_res - (t > orb_period)*RMM_COMPENSATE*x_pred(4:6);
         
         
         if max(abs(mag_mom)) > maxmagmom             % torqrod saturation with bisection
@@ -438,7 +438,7 @@ for t = tstart:tstep:tend
     vdqs = [vdqs dqs];
     vdqs_true = [vdqs_true dqs_true];
     vdw = [vdw dw]; 
-    vmag_mom = [vmag_mom mag_mom];
+    vmag_mom = [vmag_mom (mag_mom - mom_res)];
     vext_torq = [vext_torq ext_torq];
     vrmm_hat = [vrmm_hat x_pred(4:6)];
     vdw_hat = [vdw_hat x_pred(1:3)];

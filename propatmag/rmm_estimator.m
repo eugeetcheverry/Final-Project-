@@ -71,7 +71,7 @@ classdef rmm_estimator
             
             %Pasito de prediccion
             x_hat = [w; rmm] + xdot_hat*obj.dt;
-            sigma_hat = phikm1*obj.sigma*phikm1' + gammkm1*obj.Q*gammkm1';
+            sigma_hat = phikm1*obj.sigma*phikm1' + gammkm1*obj.Q*inv(gammkm1);
 
             %Cambiado respecto del paper, se usa la sensibilidad (robotica) en vez
             %de solo la R
